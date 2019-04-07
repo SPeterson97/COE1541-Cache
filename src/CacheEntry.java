@@ -5,6 +5,7 @@ public class CacheEntry {
 	public int dirtyBit;
 	public int index;
 	public int tag;
+	public int LRU;
 	
 	public CacheEntry() {
 		this.data = null;
@@ -12,6 +13,7 @@ public class CacheEntry {
 		this.dirtyBit = 0;
 		this.index = 0;
 		this.tag = 0;
+		this.LRU = 0;
 	}
 	
 	public boolean tagEquals(CacheEntry that) {
@@ -60,5 +62,11 @@ public class CacheEntry {
 	public void updateTag(int tag) {
 		this.tag = index;
 	}
+
+	public int getLRU(){
+		return this.LRU;
+	}
+
+	public void updateLRU(int LRU){ this.LRU = LRU; }
 	
 }
