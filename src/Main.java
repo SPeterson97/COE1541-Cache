@@ -37,6 +37,8 @@ public class Main {
                 writePolicy, allocationPolicy, outstandingMisses);
         L2Cache L2 = new L2Cache(sizeL2, latency, blockSizeL2, associativityL1,
                 writePolicy, allocationPolicy, outstandingMisses);
+        //pass the L2 cache to L1
+        L1.setL2(L2);
 
         //get file to process
         System.out.println("Please enter the filename of cache accesses: ");
@@ -54,6 +56,9 @@ public class Main {
             System.out.println("Can't find the file. Might not be in same directory.\n");
             System.exit(0);
         }
+
+        //variable to store total cycles
+        double totalCycles = 0;
 
         //run collection of read/writes
         while (inFile.hasNextLine()){
@@ -168,6 +173,8 @@ public class Main {
                 error = "\nAssociativity can't be less than 0";
                 throw new InternalError();
             }
+            else if (associativityL1 == 0)
+                associativityL1 = 1;
 
             //write policy
             System.out.print("Please configure the write policy: \n1. Write Back\n" +
@@ -232,19 +239,6 @@ public class Main {
         }
 
         return result.reverse().toString();
-    }
-
-    /**
-     * This function is used to convert a binary number to decimal.
-     * This function will return an unsigned int.
-     * @param binary
-     * @return
-     */
-    public int toDecimal(String binary){
-        //will check to see if the number starts with a 1, will add 0 to get positive value
-        if (binary.charAt(0) == '1')
-            binary = '0'+binary;
-        return Integer.getInteger(binary, 2);
     }
 
     public static void main(String[] args){
