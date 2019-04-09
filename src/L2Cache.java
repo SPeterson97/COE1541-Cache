@@ -30,11 +30,51 @@ public class L2Cache {
 
     /**
      * Use this function to query for the data. Return time to fetch
-     * @param type
      * @param instruction
      * @return
      */
-    public int get(String type, String instruction){
+    public int read(String instruction){
+        //check the appropriate index in each SA block.
+        for (int i = 0; i < associativity; i++){
+            if (cacheEntries[i][getWordIndex(instruction)].tagEquals(getTag(instruction))){
+                //hit, the data was found in L2 cache
+                //return the latency
+                //update LRU
+
+                return latency;
+            }
+        }
+
+        //was not found in L2, must get from memory
+        CacheEntry readFromMemory = new CacheEntry();
+        //set values of the cache
+
+
+        return 0;
+    }
+
+    public int getTag(String instruction){
+        //tag = (memory word address)/(cache size in words)
+        //cache size in words = size(bytes)/2
+        return (toDecimal(instruction)/2)/(int)size;
+    }
+
+    public int getWordIndex(String instruction){
+        //tag = (memory word address)%(cache size in words)
+        return (toDecimal(instruction)/2)%(int)size;
+    }
+
+    public int getBlockOffset(String instruction){
+        //block index = (word index)%(block size)
+        return getWordIndex(instruction)%(int)blockSize;
+    }
+
+    public int getBlockIndex(String instruction){
+        //block index = (word index)/(block size)
+        return getWordIndex(instruction)/(int)blockSize;
+    }
+
+    public int write(String instruction){
         return 0;
     }
 

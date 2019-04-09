@@ -20,6 +20,7 @@ public class Main {
     private static int blockSizeL1;
     private static int blockSizeL2;
     private static int associativityL1;
+    private static int associativityL2;
     private static int writePolicy;
     private static int allocationPolicy;
     private static int outstandingMisses;
@@ -35,7 +36,7 @@ public class Main {
         //Initialize L1 and L2 caches with information
         L1Cache L1 = new L1Cache(sizeL1, latency, blockSizeL1, associativityL1,
                 writePolicy, allocationPolicy, outstandingMisses);
-        L2Cache L2 = new L2Cache(sizeL2, latency, blockSizeL2, associativityL1,
+        L2Cache L2 = new L2Cache(sizeL2, latency+100, blockSizeL2, associativityL2,
                 writePolicy, allocationPolicy, outstandingMisses);
         //pass the L2 cache to L1
         L1.setL2(L2);
@@ -117,10 +118,10 @@ public class Main {
         String error = "";
         try{
             //obtain number of bytes
-            System.out.print("Please configure the size of the L1 cache (2^Bytes): ");
+            System.out.print("Please configure the size of the L1 cache (2^X Bytes): ");
             sizeL1 = in.nextInt();
             System.out.println("");
-            System.out.print("Please configure the size of the L2 cache (2^Bytes): ");
+            System.out.print("Please configure the size of the L2 cache (2^X Bytes): ");
             sizeL2 = in.nextInt();
             System.out.println("");
 
@@ -164,8 +165,11 @@ public class Main {
             }
 
             //obtain associativity
-            System.out.print("Please configure the associativity of L1 and L2 cache (2^Sets): ");
+            System.out.print("Please configure the associativity of L1 cache (2^Sets): ");
             associativityL1 = in.nextInt();
+            System.out.println("");
+            System.out.print("Please configure the associativity of L2 (2^Sets): ");
+            associativityL2 = in.nextInt();
             System.out.println("");
 
             //add some rules
@@ -175,6 +179,14 @@ public class Main {
             }
             else if (associativityL1 == 0)
                 associativityL1 = 1;
+
+            //add some rules
+            if (0 > associativityL2){
+                error = "\nAssociativity can't be less than 0";
+                throw new InternalError();
+            }
+            else if (associativityL2 == 0)
+                associativityL2 = 1;
 
             //write policy
             System.out.print("Please configure the write policy: \n1. Write Back\n" +

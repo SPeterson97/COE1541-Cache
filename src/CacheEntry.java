@@ -16,8 +16,8 @@ public class CacheEntry {
 		this.LRU = 0;
 	}
 	
-	public boolean tagEquals(CacheEntry that) {
-		if(this.tag != that.tag) {
+	public boolean tagEquals(int tag) {
+		if(this.tag != tag) {
 			return false;
 		}
 		return true;
@@ -68,5 +68,4 @@ public class CacheEntry {
 	}
 
 	public void updateLRU(int LRU){ this.LRU = LRU; }
-	
 }
