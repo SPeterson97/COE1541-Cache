@@ -12,10 +12,12 @@ public class L1Cache {
     public int writePolicy;
     public int allocationPolicy;
     public int outstandingMisses;
+    public int entriesPerSA;
 
     //store actual cache
     public CacheEntry[][] cacheEntries;
     public L2Cache L2;
+    private int cols;
 
     public L1Cache(int size, int latency, int blockSize, int associativity, int writePolicy,
                    int allocationPolicy, int outstandingMisses){
@@ -29,9 +31,17 @@ public class L1Cache {
 
         //check if associativity is too great for this component
         double totalEntries = size/blockSize;
-        int entriesPerSA = (int) (totalEntries/associativity);
-        cacheEntries = new CacheEntry[associativity][entriesPerSA];//[blockSize];
-        //commented out area above needs to be reflected in CacheEntry
+        entriesPerSA = (int) (totalEntries/associativity);
+        cols = size/entriesPerSA;
+        cacheEntries = new CacheEntry[entriesPerSA][size/entriesPerSA];
+
+        //initialize all entries
+        for(int i = 0; i < entriesPerSA; i++) {
+            for (int j = 0; j < size/entriesPerSA; j++) {
+                cacheEntries[i][j] = new CacheEntry();
+            }
+        }
+
     }
 
     /**
@@ -41,9 +51,9 @@ public class L1Cache {
      */
     public int read(String instruction){
         //check the appropriate index in each SA block.
-        for (int i = 0; i < associativity; i++){
-            if (cacheEntries[i][getWordIndex(instruction)] != null &&
-                    cacheEntries[i][getWordIndex(instruction)].tagEquals(getTag(instruction))){
+        for (int i = 0; i < cols; i++){
+            if ( i % associativity == 0 && cacheEntries[getWordIndex(instruction)][i].getLRU() != -1 &&
+                    cacheEntries[getWordIndex(instruction)][i].tagEquals(getTag(instruction))){
                 //hit, the cache entry with matching tags was found.
                 //latency of this level of cache is returned
                 //update LRU
@@ -93,7 +103,7 @@ public class L1Cache {
     private void updateLRU(int valueLRU){
         for(CacheEntry[] ceArr : cacheEntries){
             for (CacheEntry ce : ceArr){
-                if (ce == null) {
+                if (ce.getLRU() == -1) {
                     //skip
                 }
                 else{

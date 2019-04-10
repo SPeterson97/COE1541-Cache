@@ -13,7 +13,7 @@ public class CacheEntry {
 		this.dirtyBit = 0;
 		this.index = 0;
 		this.tag = 0;
-		this.LRU = 0;
+		this.LRU = -1;
 	}
 	
 	public boolean tagEquals(int tag) {
