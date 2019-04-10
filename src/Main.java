@@ -26,12 +26,22 @@ public class Main {
     private static int outstandingMisses;
 
 
-    public static void run(){
+    public static void run(int mode){
         //create scanner to read in data
         Scanner in = new Scanner(System.in);
 
         //get all the data from the user
-        dataCollection(in);
+        if (mode == 1){
+            try {
+                Scanner preset = new Scanner(new File("preset.txt"));
+                dataCollection(preset,1);
+            }
+            catch (Exception e){
+                System.out.println("Problem with preset values");
+            }
+        }
+        else
+            dataCollection(in);
 
         //Initialize L1 and L2 caches with information
         L1Cache L1 = new L1Cache(sizeL1, latency, blockSizeL1, associativityL1,
@@ -237,6 +247,44 @@ public class Main {
         }
     }
 
+    public static void dataCollection(Scanner in, int mode){
+        /*
+         *Data to retrieve:
+         * Size of L1 and L2 cache
+         * Access latency of L1 (L2 = L1 + 100)
+         * Block size in bytes
+         * Set associativity
+         * Write policy: Write Back, Write Through, Write Evict
+         * Allocation Policy: Write Allocate, Non-Write Allocate
+         * Max Number of Outstanding Misses
+         */
+        int i = 0;
+        while(in.hasNextLine()){
+            String line = in.nextLine();
+            if (i == 0)
+                sizeL1 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 1)
+                sizeL2 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 2)
+                latency = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 3)
+                blockSizeL1 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 4)
+                blockSizeL2 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 5)
+                associativityL1 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 6)
+                associativityL2 = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 7)
+                writePolicy = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 8)
+                allocationPolicy = Integer.parseInt(line.split(" ")[1]);
+            else if (i == 9)
+                outstandingMisses = Integer.parseInt(line.split(" ")[1]);
+            i++;
+        }
+    }
+
     /**
      * This function is used to convert base 10 numbers to binary.
      * @param num
@@ -270,6 +318,6 @@ public class Main {
     }
 
     public static void main(String[] args){
-        run();
+        run(args.length);
     }
 }
