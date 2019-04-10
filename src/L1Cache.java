@@ -13,6 +13,7 @@ public class L1Cache {
     public int allocationPolicy;
     public int outstandingMisses;
     public int entriesPerSA;
+    public int filledCache;
 
     //store actual cache
     public CacheEntry[][] cacheEntries;
@@ -28,6 +29,7 @@ public class L1Cache {
         this.writePolicy = writePolicy;
         this.allocationPolicy = allocationPolicy;
         this.outstandingMisses = outstandingMisses;
+        this.filledCache = 0;
 
         //check if associativity is too great for this component
         double totalEntries = size/blockSize;
@@ -100,17 +102,55 @@ public class L1Cache {
      * all values below will be kept the same
      * @param valueLRU
      */
-    private void updateLRU(int valueLRU){
+    private void updateLRU(int valueLRU, int action){
+        //action = 0--> update on a read, replacing existing block(LRU of block replacing
+        //action = 1 --> adding to cache, not in cache
+        //action = -1 --> removing from cache
+        int max = -1;
         for(CacheEntry[] ceArr : cacheEntries){
             for (CacheEntry ce : ceArr){
-                if (ce.getLRU() == -1) {
-                    //skip
+                if (action == 0){
+                    int currentLRU = ce.getLRU();
+                    //keep track of max LRU
+                    if (currentLRU > max)
+                        max = ce.getLRU();
+
+                    if (currentLRU == -1){
+                        //do nothing
+                    }
+                    else if (currentLRU < valueLRU){
+                        ce.updateLRU(currentLRU + 1);
+                    }
+                }
+                else if (action == 1){
+                    int currentLRU = ce.getLRU();
+                    //keep track of max LRU
+                    if (currentLRU > max)
+                        max = ce.getLRU();
+                    //increment all LRUs
+                    if (currentLRU != -1){
+                        ce.updateLRU(currentLRU + 1);
+                    }
+                }
+                else if (action ==-1){
+                    int currentLRU = ce.getLRU();
+                    //keep track of max LRU
+                    if (currentLRU > max)
+                        max = ce.getLRU() - 1;
+
+                    //decrease all LRUs that are greater than
+                    if (currentLRU > valueLRU){
+                        ce.updateLRU(currentLRU-1);
+                    }
                 }
                 else{
-                    if (ce.getLRU() > valueLRU)
-                        ce.updateLRU(ce.getLRU() - 1);
+                    System.out.println("error, this case should never occur.");
                 }
             }
+        }
+        //compare to filled size of cache
+        if (max != filledCache){
+            System.out.println("Max value of LRU is different than the filled cache variable.");
         }
     }
 
@@ -140,12 +180,12 @@ public class L1Cache {
     }
 
     public int getWordIndex(String instruction){
-        //tag = (memory word address)%(cache size in words)
+        //index = (memory word address)%(cache size in words)
         return (toDecimal(instruction)/2)%(int)size;
     }
 
     public int getBlockOffset(String instruction){
-        //block index = (word index)%(block size)
+        //block offset = (word index)%(block size)
         return getWordIndex(instruction)%(int)blockSize;
     }
 
