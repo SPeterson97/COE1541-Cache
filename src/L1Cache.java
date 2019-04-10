@@ -3,6 +3,9 @@ public class L1Cache {
     private int WRITE_BACK = 1;
     private int WRITE_THROUGH = 2;
     private int WRITE_EVICT = 3;
+    private int READ_REPLACE = 0;
+    private int ADDING_TO_CACHE = 1;
+    private int REMOVING_FROM_CACHE = -1;
 
     //store details about cache
     public double size;
@@ -12,13 +15,13 @@ public class L1Cache {
     public int writePolicy;
     public int allocationPolicy;
     public int outstandingMisses;
-    public int entriesPerSA;
     public int filledCache;
 
     //store actual cache
     public CacheEntry[][] cacheEntries;
     public L2Cache L2;
     private int cols;
+    private int indexes;
 
     public L1Cache(int size, int latency, int blockSize, int associativity, int writePolicy,
                    int allocationPolicy, int outstandingMisses){
@@ -33,14 +36,14 @@ public class L1Cache {
 
         //check if associativity is too great for this component
         double totalEntries = size/blockSize;
-        entriesPerSA = (int) (totalEntries/associativity);
-        cols = size/entriesPerSA;
-        cacheEntries = new CacheEntry[entriesPerSA][size/entriesPerSA];
+        indexes= (int) (totalEntries/associativity);
+        cols = size/indexes;
+        cacheEntries = new CacheEntry[indexes][cols];
 
         //initialize all entries
-        for(int i = 0; i < entriesPerSA; i++) {
-            for (int j = 0; j < size/entriesPerSA; j++) {
-                cacheEntries[i][j] = new CacheEntry();
+        for(int i = 0; i < indexes; i++) {
+            for (int j = 0; j < cols; j++) {
+                cacheEntries[i][j] = new CacheEntry(null);
             }
         }
 
@@ -53,21 +56,61 @@ public class L1Cache {
      */
     public int read(String instruction){
         //check the appropriate index in each SA block.
-        for (int i = 0; i < cols; i++){
-            if ( i % associativity == 0 && cacheEntries[getWordIndex(instruction)][i].getLRU() != -1 &&
-                    cacheEntries[getWordIndex(instruction)][i].tagEquals(getTag(instruction))){
-                //hit, the cache entry with matching tags was found.
-                //latency of this level of cache is returned
+        //if associativity = 1, look at col = 0
+        //if associativity > 1, look at col % associativity == 0
+        int index = getWordIndex(instruction);
+        int instructionTag = getTag(instruction);
+
+        if (associativity == 0){
+            //compare when only col = 0;
+            //make sure data is consistent across blocks
+            if ( cacheEntries[index][0].tagEquals(instructionTag) ){
+                //tags are equal, so cache hit
                 //update LRU
-                updateLRU(cacheEntries[i][getWordIndex(instruction)].getLRU());
+                updateLRU(cacheEntries[index][0].getLRU(),READ_REPLACE);
+
+                //set all blocks in that row to have LRU of 0
+                for (int i = 0; i < blockSize; i++){
+                    cacheEntries[index][i].updateLRU(READ_REPLACE);
+                }
+                //return time to complete read
                 return latency;
             }
+            else{
+                //L1 miss, check L2
+                //read needs to send back cache blocks and latency
+                this.write(instruction);
+                return latency + L2.read(instruction);
+            }
         }
+        else{
+            //need to only read first in each way of associativity
+            //need to check cols that satisfy col % associativity == 0
+            //iterate through the cols
+            for (int i = 0; i < cols; i++){
+                if (i % associativity == 0){
+                    //check tags
+                    if( cacheEntries[index][i].getTag() == instructionTag ){
+                        //match, L1 cache hit
+                        //update LRU
+                        updateLRU(cacheEntries[index][i].getLRU(),READ_REPLACE);
 
-        //was not found in L1 cache, must query L2 cache
+                        //set all blocks in that row to have LRU of 0
+                        for (int j = 0; i < blockSize; i++){
+                            cacheEntries[index][j].updateLRU(READ_REPLACE);
+                        }
+                        //return time to complete read
+                        return latency;
+                    }
+                }
+            }
 
-
-        return 0;
+            //no match was found
+            //L1 miss, check L2
+            //read needs to send back cache blocks and latency
+            this.write(instruction);
+            return latency + L2.read(instruction);
+        }
     }
 
     public int write(String instruction){
@@ -202,9 +245,11 @@ public class L1Cache {
      */
     public int toDecimal(String binary){
         //will check to see if the number starts with a 1, will add 0 to get positive value
+        StringBuilder s = new StringBuilder();
         if (binary.charAt(0) == '1')
-            binary = '0'+binary;
-        return Integer.getInteger(binary, 2);
+            s.append('0');
+        s.append(binary);
+        return Integer.parseInt(s.toString(), 2);
     }
 
     /**

@@ -38,8 +38,9 @@ public class Main {
                 writePolicy, allocationPolicy, outstandingMisses);
         L2Cache L2 = new L2Cache(sizeL2, latency+100, blockSizeL2, associativityL2,
                 writePolicy, allocationPolicy, outstandingMisses);
-        //pass the L2 cache to L1
+        //pass the L2 cache to L1, and L1 to L2
         L1.setL2(L2);
+        L2.setL1(L1);
 
         //get file to process
         System.out.println("Please enter the filename of cache accesses: ");
@@ -251,6 +252,21 @@ public class Main {
         }
 
         return result.reverse().toString();
+    }
+
+    /**
+     * This function is used to convert a binary number to decimal.
+     * This function will return an unsigned int.
+     * @param binary
+     * @return
+     */
+    public int toDecimal(String binary){
+        //will check to see if the number starts with a 1, will add 0 to get positive value
+        StringBuilder s = new StringBuilder();
+        if (binary.charAt(0) == '1')
+            s.append('0');
+        s.append(binary);
+        return Integer.parseInt(s.toString(), 2);
     }
 
     public static void main(String[] args){

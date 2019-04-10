@@ -6,14 +6,16 @@ public class CacheEntry {
 	public int index;
 	public int tag;
 	public int LRU;
+	public int writes;
 	
-	public CacheEntry() {
-		this.data = null;
+	public CacheEntry(String instruction) {
+		this.data = instruction;
 		this.validBit = 0;
 		this.dirtyBit = 0;
 		this.index = 0;
 		this.tag = 0;
 		this.LRU = -1;
+		this.writes = 0;
 	}
 	
 	public boolean tagEquals(int tag) {
@@ -22,6 +24,10 @@ public class CacheEntry {
 		}
 		return true;
 	}
+
+	public void write(){ this.writes++; }
+
+	public String getInstruction(){ return this.data; }
 	
 	public String getData() {
 		return this.data;
