@@ -59,7 +59,7 @@ public class L1Cache {
         //check the appropriate index in each SA block.
         //if associativity = 1, look at col = 0
         //if associativity > 1, look at col % associativity == 0
-        int index = getWordIndex(instruction);
+        int index = getIndex(instruction);
         int instructionTag = getTag(instruction);
 
         if (associativity == 0){
@@ -136,7 +136,7 @@ public class L1Cache {
 
     private int writeBack(String instruction){
 		
-        int blockIndex = getBlockIndex(instruction);
+        int blockIndex = getIndex(instruction);
 		int blockOffset = getBlockOffset(instruction);
 		int tag = getTag(instruction);
 		
@@ -261,14 +261,23 @@ public class L1Cache {
     }
 
     /**
-     * This function will find the lowest LRU and return the a and b cacheEntries[a][b]
-     * index. The rest of the LRUs will be updated accordingly
+     * This function will find the lowest LRU cache block index
+     * index.
      * @return
      */
-    private int[] nextEvict(){
-        //need to consider row that's empty
-        int[] a = {0,2};
-        return a;
+    private int nextEvict(CacheEntry[] cacheRow){
+        int maxLRU = -1;
+        int index = -1;
+        for (int i = 0; i < cacheRow.length/associativity; i++){
+            if (i % associativity == 0 && cacheRow[i].getLRU() == -1){
+                return i;
+            }
+            else if(i % associativity == 0 && cacheRow[i].getLRU() > maxLRU){
+                maxLRU = cacheRow[i].getLRU();
+                index = i;
+            }
+        }
+        return index;
     }
 
     /**
@@ -279,25 +288,38 @@ public class L1Cache {
         this.L2 = L2;
     }
 
+    public String parseBits(String instruction, int type){
+        //offset, bytes per block log(bytes per block)
+        //index, log(rows)
+        //tag = remaining
+        int offsetBits = (int) Math.log((int) blockSize);
+        int indexBits = (int) Math.log(indexes);
+        int tag = instruction.length() - (offsetBits + indexBits);
+
+        //type: 1-tag, 2-index, 3-offset
+        if (type == 1)
+            return instruction.substring(0,tag);
+        else if (type == 2)
+            return instruction.substring(tag,offsetBits);
+        else
+            return instruction.substring(tag+indexBits);
+    }
+
+
     public int getTag(String instruction){
         //tag = (memory word address)/(cache size in words)
         //cache size in words = size(bytes)/2
-        return (toDecimal(instruction)/2)/(int)size;
-    }
-
-    public int getWordIndex(String instruction){
-        //index = (memory word address)%(cache size in words)
-        return (toDecimal(instruction)/2)%(int)size;
+        return toDecimal(parseBits(instruction,1));
     }
 
     public int getBlockOffset(String instruction){
         //block offset = (word index)%(block size)
-        return getWordIndex(instruction)%(int)blockSize;
+        return toDecimal(parseBits(instruction,3));
     }
 
-    public int getBlockIndex(String instruction){
+    public int getIndex(String instruction){
         //block index = (word index)/(block size)
-        return getWordIndex(instruction)/(int)blockSize;
+        return toDecimal(parseBits(instruction, 2));
     }
 
     /**
