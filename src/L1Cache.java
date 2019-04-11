@@ -137,11 +137,11 @@ public class L1Cache {
     private int writeBack(String instruction){
 		
         int blockIndex = getIndex(instruction);
-		int blockOffset = getBlockOffset(instruction);
+		int blockCol = (blockIndex % this.blockSize);
 		int tag = getTag(instruction);
 		
 		CacheEntry newData = new CacheEntry(instruction);
-		CacheEntry currData = cacheEntries[blockIndex][blockOffset];
+		CacheEntry currData = cacheEntries[blockIndex][blockCol];
 		
 		//check for miss then hit, then write based on allocationPolicy
 		if(tag != currData.tag || currData.validBit == 0) {
@@ -162,7 +162,7 @@ public class L1Cache {
 				newData.write();
 				newData.dirtyBit = 1;
 				//write to L2 - call read
-				cacheEntries[blockIndex][blockOffset] = newData;
+				cacheEntries[blockIndex][blockCol] = newData;
 			}
 			else if(this.allocationPolicy == 2) {
 				//non write allocate miss - update main mem, NOT bring block to cache
@@ -188,14 +188,69 @@ public class L1Cache {
 			newData.dirtyBit = 1;
 
 			//call update LRU
-			cacheEntries[blockIndex][blockOffset] = newData;
+			cacheEntries[blockIndex][blockCol] = newData;
 		}
 		
         return latency;
     }
 
     private int writeThrough(String instruction){
-        return 0;
+		
+		int blockIndex = getIndex(instruction);
+		int blockCol = (blockIndex % this.blockSize);
+		int tag = getTag(instruction);
+		
+		CacheEntry newData = new CacheEntry(instruction);
+		CacheEntry currData = cacheEntries[blockIndex][blockCol];
+		
+		//check for miss then hit, then write based on allocationPolicy
+		if(tag != currData.tag || currData.validBit == 0) {
+			if(this.allocationPolicy == 1) {
+				//write allocate miss - updates block in mem and brings back to cache
+				
+				/*if(currData.validBit == 0) {
+					//no data, adding to cache - not in cache
+					updateLRU(0, 1);
+					newData.updateLRU(0);
+				}
+				else {
+					//data, replacing existing block
+					updateLRU(currData.getLRU(), 0);
+					newData.updateLRU(0);
+				}
+	
+				newData.write();
+				newData.dirtyBit = -1;
+				//write to L2 - call read
+				cacheEntries[blockIndex][blockCol] = newData;*/
+			}
+			else if(this.allocationPolicy == 2) {
+				//non write allocate miss - update main mem not bringing back to cache
+			}
+		}
+		else if(tag == currData.tag && currData.validBit == 1) {
+			//write allocate hit - write to cache and main mem
+			//non write allocate hit - write to cache and main mem
+			
+			if(currData.validBit == 0) {
+				//no data, adding to cache - not in cache
+				updateLRU(0, 1);
+				newData.updateLRU(0);
+			}
+			else {
+				//data, replacing existing block
+				updateLRU(currData.getLRU(), 0);
+				newData.updateLRU(0);
+			}
+			
+			newData.write();
+			newData.dirtyBit = -1;
+			//write to L2 as well
+			cacheEntries[blockIndex][blockCol] = newData;
+		}
+		
+		
+        return latency;
     }
 
     private int writeEvict(String instruction){
