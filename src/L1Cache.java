@@ -71,70 +71,35 @@ public class L1Cache {
 
                     //update lru
                     updateLRU(lru, 0);
+
+                    return latency;
                 }
             }
-
         }
-        else if (L2.snoop(instruction)){
+        else {
             //see if the instruction is in L2Cache
+            int latencyL2 = L2.read(instruction);
+            int id = getIndex(instruction);
+
+            //find the next block to replace
+            int idx = nextEvict(cacheEntries[id]);
+
+            //replace the block at the found index
+            int lru = cacheEntries[id][idx].getLRU();
+
+            //replace the blocks
+            replace(cacheEntries[id], idx, instruction, false);
+
+            //need to update lru of L1
+            int action = 0;
+            if (lru == -1)
+                action = 1;
+            updateLRU(lru, action);
+
+            return latency + latencyL2;
         }
-        else{
-            //not in L1 or L2. Must write from memory
-        }
-
-
-
-
-        if (associativity == 0){
-            //compare when only col = 0;
-            //make sure data is consistent across blocks
-            if ( cacheEntries[index][0].tagEquals(instructionTag) ){
-                //tags are equal, so cache hit
-                //update LRU
-                updateLRU(cacheEntries[index][0].getLRU(),READ_REPLACE);
-
-                //set all blocks in that row to have LRU of 0
-                for (int i = 0; i < blockSize; i++){
-                    cacheEntries[index][i].updateLRU(READ_REPLACE);
-                }
-                //return time to complete read
-                return latency;
-            }
-            else{
-                //L1 miss, check L2
-                //read needs to send back cache blocks and latency
-                this.write(instruction);
-                return latency + L2.read(instruction);
-            }
-        }
-        else{
-            //need to only read first in each way of associativity
-            //need to check cols that satisfy col % associativity == 0
-            //iterate through the cols
-            for (int i = 0; i < cols; i++){
-                if (i % associativity == 0){
-                    //check tags
-                    if( cacheEntries[index][i].getTag() == instructionTag ){
-                        //match, L1 cache hit
-                        //update LRU
-                        updateLRU(cacheEntries[index][i].getLRU(),READ_REPLACE);
-
-                        //set all blocks in that row to have LRU of 0
-                        for (int j = 0; i < blockSize; i++){
-                            cacheEntries[index][j].updateLRU(READ_REPLACE);
-                        }
-                        //return time to complete read
-                        return latency;
-                    }
-                }
-            }
-
-            //no match was found
-            //L1 miss, check L2
-            //read needs to send back cache blocks and latency
-            this.write(instruction);
-            return latency + L2.read(instruction);
-        }
+        //should ever reach here
+        return -1;
     }
 
 	/**
