@@ -187,41 +187,51 @@ public class L1Cache {
 
     private int writeThrough(String instruction){
 		
-		int idx = getIndex(instruction);
+		int index = getIndex(instruction);
         int tag = getTag(instruction);
 		
 		//check for miss then hit, then write based on allocationPolicy
 		if(!snoop(instruction)) {
+		    int lat = 0;
 			if(this.allocationPolicy == 1) {
 				//write allocate miss - updates block in mem and brings back to cache
 			}
 			else if(this.allocationPolicy == 2) {
 				//non write allocate miss - update main mem not bringing back to cache
+                lat = L2.write(instruction);
 			}
 			
-			return latency;
+			return (2*latency)+lat;
 		}
 		else {
 			//write allocate hit - write to cache and main mem
 			//non write allocate hit - write to cache and main mem
 			
 			for (int i = 0; i < cols; i++) {
-				if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
-					//get current LRU value
-					int lru = cacheEntries[idx][i].getLRU();
+				if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == tag){
 
-					//found the match, need to write through to L2
-					replace(cacheEntries[idx], i, instruction, false);
+                    int lru =-1;
+                    for (int j = 0; j<cols; j++){
+                        if (cacheEntries[index][j].getTag() == tag){
+                            lru = cacheEntries[index][j].getLRU();
+                            cacheEntries[index][j].write();
+                        }
+                    }
 
-					//need to update the LRU
-					updateLRU(lru, 0);
+                    //update other LRU values
+                    updateLRU(lru,0);
+
+                    for (int j = 0; j<cols; j++){
+                        if (cacheEntries[index][j].getTag() == tag){
+                            cacheEntries[index][j].updateLRU(0);
+                        }
+                    }
 
 					//need write through L2 cache as well
 					//write through to memory as well
-					return latency + L2.write(instruction);
+					return (2*latency) + L2.write(instruction);
 				}
 			}
-
 		}
 		return -1;
     }
