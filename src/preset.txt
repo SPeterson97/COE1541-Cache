@@ -1,10 +1,9 @@
 sizeL1 4
 sizeL2 5
-latency 1
-blockSizeL1 1
-blockSizeL2 1
-associativityL1 1
-associativityL2 1
+latencyL1 5
+latencyL2 10
+blockSize 2
+associativity 2
 writePolicy 1
 allocationPolicy 1
 outstandingMisses 1

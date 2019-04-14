@@ -7,15 +7,27 @@ public class CacheEntry {
 	public int tag;
 	public int LRU;
 	public int writes;
+	public int number;
+	public boolean blocked;
 	
-	public CacheEntry(String instruction) {
+	public CacheEntry(String instruction, int number) {
 		this.data = instruction;
+		this.number = number;
 		this.validBit = 0;
 		this.dirtyBit = 0;
 		this.index = 0;
 		this.tag = 0;
 		this.LRU = -1;
 		this.writes = 0;
+		this.blocked = false;
+	}
+
+	public boolean getBlocked(){
+		return this.blocked;
+	}
+
+	public void setBlocked(boolean blocked){
+		this.blocked = blocked;
 	}
 	
 	public boolean tagEquals(int tag) {

@@ -16,11 +16,10 @@ public class Main {
 
     public static int sizeL1;
     private static int sizeL2;
-    public static int latency;
-    private static int blockSizeL1;
-    private static int blockSizeL2;
-    private static int associativityL1;
-    private static int associativityL2;
+    public static int latencyL1;
+    public static int latencyL2;
+    private static int blockSize;
+    private static int associativity;
     private static int writePolicy;
     private static int allocationPolicy;
     private static int outstandingMisses;
@@ -44,9 +43,9 @@ public class Main {
             dataCollection(in);
 
         //Initialize L1 and L2 caches with information
-        L1Cache L1 = new L1Cache(sizeL1, latency, blockSizeL1, associativityL1,
+        L1Cache L1 = new L1Cache(sizeL1, latencyL1, blockSize, associativity,
                 writePolicy, allocationPolicy, outstandingMisses);
-        L2Cache L2 = new L2Cache(sizeL2, latency+100, blockSizeL2, associativityL2,
+        L2Cache L2 = new L2Cache(sizeL2, latencyL2, blockSize, associativity,
                 writePolicy, allocationPolicy, outstandingMisses);
         //pass the L2 cache to L1, and L1 to L2
         L1.setL2(L2);
@@ -147,57 +146,42 @@ public class Main {
             }
 
             //obtain access latency
-            System.out.print("Please configure the access latency for L1 cache (L2 cache = L1 + 100): ");
-            latency = in.nextInt();
+            System.out.print("Please configure the access latency for L1 cache: ");
+            latencyL1 = in.nextInt();
+            System.out.println("");
+            System.out.print("Please configure the access latency for L2 cache: ");
+            latencyL2 = in.nextInt();
             System.out.println("");
 
             //add some rules
-            if (latency <= 0){
+            if (latencyL1 <= 0 || latencyL2 <= 0){
                 error = "\nCan't have negative, or 0, latency";
                 throw new InternalError();
             }
 
             //obtain block size
-            System.out.print("Please configure the block size of the L1 cache (2^Bytes): ");
-            blockSizeL1 = in.nextInt();
-            System.out.println("");
-            System.out.print("Please configure the block size of the L2 cache (2^Bytes): ");
-            blockSizeL2 = in.nextInt();
+            System.out.print("Please configure the block size of the cache (2^Bytes): ");
+            blockSize = in.nextInt();
             System.out.println("");
 
             //add some rules
-            if (blockSizeL2 < blockSizeL1){
-                error = "\nBlock size of L2 can't be less than L1";
-                throw new InternalError();
-            }
-            else if (blockSizeL1 < 0 || blockSizeL2 < 0){
+            if (blockSize < 0){
                 error = "\nSize can't be less than 0.";
                 throw new InternalError();
             }
 
             //obtain associativity
-            System.out.print("Please configure the associativity of L1 cache (2^Sets): ");
-            associativityL1 = in.nextInt();
-            System.out.println("");
-            System.out.print("Please configure the associativity of L2 (2^Sets): ");
-            associativityL2 = in.nextInt();
+            System.out.print("Please configure the associativity of the cache (2^Sets): ");
+            associativity = in.nextInt();
             System.out.println("");
 
             //add some rules
-            if (0 > associativityL1){
+            if (0 > associativity){
                 error = "\nAssociativity can't be less than 0";
                 throw new InternalError();
             }
-            else if (associativityL1 == 0)
-                associativityL1 = 1;
-
-            //add some rules
-            if (0 > associativityL2){
-                error = "\nAssociativity can't be less than 0";
-                throw new InternalError();
-            }
-            else if (associativityL2 == 0)
-                associativityL2 = 1;
+            else if (associativity == 0)
+                associativity = 1;
 
             //write policy
             System.out.print("Please configure the write policy: \n1. Write Back\n" +
@@ -266,20 +250,18 @@ public class Main {
             else if (i == 1)
                 sizeL2 = Integer.parseInt(line.split(" ")[1]);
             else if (i == 2)
-                latency = Integer.parseInt(line.split(" ")[1]);
+                latencyL1 = Integer.parseInt(line.split(" ")[1]);
             else if (i == 3)
-                blockSizeL1 = Integer.parseInt(line.split(" ")[1]);
+                latencyL2 = Integer.parseInt(line.split(" ")[1]);
             else if (i == 4)
-                blockSizeL2 = Integer.parseInt(line.split(" ")[1]);
+                blockSize = Integer.parseInt(line.split(" ")[1]);
             else if (i == 5)
-                associativityL1 = Integer.parseInt(line.split(" ")[1]);
+                associativity = Integer.parseInt(line.split(" ")[1]);
             else if (i == 6)
-                associativityL2 = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 7)
                 writePolicy = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 8)
+            else if (i == 7)
                 allocationPolicy = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 9)
+            else if (i == 8)
                 outstandingMisses = Integer.parseInt(line.split(" ")[1]);
             i++;
         }

@@ -44,7 +44,7 @@ public class L2Cache {
         //initialize all entries
         for(int i = 0; i < indexes; i++) {
             for (int j = 0; j < cols; j++) {
-                cacheEntries[i][j] = new CacheEntry(null);
+                cacheEntries[i][j] = new CacheEntry(null, 0);
             }
         }
     }
@@ -120,6 +120,38 @@ public class L2Cache {
     }
 
     /**
+     * Use this function to forward into the correct write policy
+     * this allows main to call one write regardless of policy
+     * @param instruction
+     * @return
+     */
+    public int write(String instruction){
+        if (writePolicy == WRITE_BACK){
+            latency = writeBack(instruction);
+        }
+        else if (writePolicy == WRITE_THROUGH){
+            latency = writeThrough(instruction);
+        }
+        else if (writePolicy == WRITE_EVICT){
+            latency = writeEvict(instruction);
+        }
+
+        return latency;
+    }
+
+    public int writeBack(String instruction){
+        return 0;
+    }
+
+    public int writeThrough(String instruction){
+        return  0;
+    }
+
+    public int writeEvict(String instruction){
+        return 0;
+    }
+
+    /**
      * insert value of LRU that is being modified
      * all values above that will be decremented
      * all values below will be kept the same
@@ -181,29 +213,52 @@ public class L2Cache {
         this.L1 = l1;
     }
 
+    /**
+     * Use this method to snoop the cache and see if it is present in the cache
+     * This method will be useful when doing accesses under writes
+     * @param instruction
+     * @return
+     */
+    public boolean snoop(String instruction){
+        for (int i = 0; i< cols; i++){
+            if (i % associativity == 0 && cacheEntries[indexes][i].getTag() == getTag(instruction)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public String parseBits(String instruction, int type){
+        //offset, bytes per block log(bytes per block)
+        //index, log(rows)
+        //tag = remaining
+        int offsetBits = (int) Math.log((int) blockSize);
+        int indexBits = (int) Math.log(indexes);
+        int tag = instruction.length() - (offsetBits + indexBits);
+
+        //type: 1-tag, 2-index, 3-offset
+        if (type == 1)
+            return instruction.substring(0,tag);
+        else if (type == 2)
+            return instruction.substring(tag,offsetBits);
+        else
+            return instruction.substring(tag+indexBits);
+    }
+
     public int getTag(String instruction){
         //tag = (memory word address)/(cache size in words)
         //cache size in words = size(bytes)/2
-        return (toDecimal(instruction)/2)/(int)size;
-    }
-
-    public int getWordIndex(String instruction){
-        //tag = (memory word address)%(cache size in words)
-        return (toDecimal(instruction)/2)%(int)size;
+        return toDecimal(parseBits(instruction,1));
     }
 
     public int getBlockOffset(String instruction){
-        //block index = (word index)%(block size)
-        return getWordIndex(instruction)%(int)blockSize;
+        //block offset = (word index)%(block size)
+        return toDecimal(parseBits(instruction,3));
     }
 
-    public int getBlockIndex(String instruction){
+    public int getIndex(String instruction){
         //block index = (word index)/(block size)
-        return getWordIndex(instruction)/(int)blockSize;
-    }
-
-    public int write(String instruction){
-        return 0;
+        return toDecimal(parseBits(instruction, 2));
     }
 
     /**

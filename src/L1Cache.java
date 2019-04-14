@@ -44,7 +44,7 @@ public class L1Cache {
         //initialize all entries
         for(int i = 0; i < indexes; i++) {
             for (int j = 0; j < cols; j++) {
-                cacheEntries[i][j] = new CacheEntry(null);
+                cacheEntries[i][j] = new CacheEntry(null, 0);
             }
         }
 
@@ -254,7 +254,31 @@ public class L1Cache {
     }
 
     private int writeEvict(String instruction){
-        return 0;
+        int idx = getIndex(instruction);
+        int tag = getTag(instruction);
+                
+        if (snoop(instruction)) {
+            //value is in this cache, possibly in L2 as well
+            for (int i = 0; i < cols; i++) {
+                if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+                    //get current LRU value
+                    int lru = cacheEntries[idx][i].getLRU();
+
+                    //found the match, need to evict
+                    replace(cacheEntries[idx], i, instruction, true);
+
+                    //need to update the LRU
+                    updateLRU(lru, -1);
+
+                    //need write evict from L2 cache as well
+                    return latency + L2.write(instruction);
+                }
+            }
+        }
+        else{
+            //need to check L2 as well. If not there, just write to mem
+            return latency + L2.write(instruction);
+        }
     }
 
     /**
@@ -276,14 +300,13 @@ public class L1Cache {
                     if (currentLRU > max)
                         max = ce.getLRU();
 
-                    if (currentLRU == -1){
-                        //do nothing
-                    }
-                    else if (currentLRU < valueLRU){
+                    //don't update a non-used block
+                    if (currentLRU < valueLRU){
                         ce.updateLRU(currentLRU + 1);
                     }
                 }
                 else if (action == 1){
+                    //adding a block not already there
                     int currentLRU = ce.getLRU();
                     //keep track of max LRU
                     if (currentLRU > max)
@@ -323,7 +346,7 @@ public class L1Cache {
     private int nextEvict(CacheEntry[] cacheRow){
         int maxLRU = -1;
         int index = -1;
-        for (int i = 0; i < cacheRow.length/associativity; i++){
+        for (int i = 0; i < cacheRow.length; i++){
             if (i % associativity == 0 && cacheRow[i].getLRU() == -1){
                 return i;
             }
@@ -333,6 +356,41 @@ public class L1Cache {
             }
         }
         return index;
+    }
+
+    /**
+     * Use this function to replace a block of cache with new cache entries
+     * If evict is true, then we are just replacing the block with an empty cache entry
+     * @param cacheRow
+     * @param index
+     * @param instruction
+     * @param evict
+     */
+    private void replace(CacheEntry[] cacheRow, int index, String instruction, boolean evict){
+        for(int i = index; i< index+blockSize; i++){
+            if (evict){
+                //replace the spot with empty space
+                cacheRow[i] = new CacheEntry(null, 0);
+            }
+            else{
+                cacheRow[i] = new CacheEntry(instruction, i - index);
+            }
+        }
+    }
+
+    /**
+     * Use this method to snoop the cache and see if it is present in the cache
+     * This method will be useful when doing accesses under writes
+     * @param instruction
+     * @return
+     */
+    public boolean snoop(String instruction){
+        for (int i = 0; i< cols; i++){
+            if (i % associativity == 0 && cacheEntries[indexes][i].getTag() == getTag(instruction)){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -359,7 +417,6 @@ public class L1Cache {
         else
             return instruction.substring(tag+indexBits);
     }
-
 
     public int getTag(String instruction){
         //tag = (memory word address)/(cache size in words)
