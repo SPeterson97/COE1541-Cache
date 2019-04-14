@@ -36,10 +36,10 @@ public class L2Cache {
         this.filledCache = 0;
 
         //check if associativity is too great for this component
-        double totalEntries = size/blockSize;
-        indexes = (int) (totalEntries/associativity);
-        cols = size/indexes;
-        cacheEntries = new CacheEntry[indexes][size/indexes];
+        double totalEntries = this.size/this.blockSize;
+        indexes = (int) (totalEntries/this.associativity);
+        cols = (int) this.size/indexes;
+        cacheEntries = new CacheEntry[indexes][cols];
 
         //initialize all entries
         for(int i = 0; i < indexes; i++) {
@@ -57,24 +57,29 @@ public class L2Cache {
     public int read(String instruction){
         //get useful info
         int index = getIndex(instruction);
+        System.out.println("Read L2: "+index);
         int instructionTag = getTag(instruction);
 
         //check if it is in L2
         if (snoop(instruction)){
+            System.out.println("Hit");
             //it is in L2, will only need to update LRU and return latency
             for (int i = 0; i< cols; i++){
-                if ( i % associativity == 0 && cacheEntries[index][i].getTag() == instructionTag){
+                if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == instructionTag){
                     //get lru value of block to replace
                     int lru = cacheEntries[index][i].getLRU();
 
                     //update lru
                     updateLRU(lru, 0);
 
+                    cacheEntries[index][i].updateLRU(0);
+
                     return latency;
                 }
             }
         }
         else {
+            System.out.println("Miss");
             //not in L2, must go to memory
             //find the next block to replace
             int idx = L1.nextEvict(cacheEntries[index]);
@@ -88,6 +93,7 @@ public class L2Cache {
                 action = 1;
             updateLRU(lru, action);
 
+            System.out.println("Writing to L1");
             //replace the blocks
             replace(cacheEntries[index], idx, instruction, false);
 
@@ -118,6 +124,7 @@ public class L2Cache {
     }
 
     public int writeBack(String instruction){
+        System.out.println("YOU DONE FUCKED UP");
         return 0;
     }
 
@@ -133,7 +140,7 @@ public class L2Cache {
         if (snoop(instruction)) {
             //value is in this cache, possibly in L2 as well
             for (int i = 0; i < cols; i++) {
-                if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+                if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
                     //get current LRU value
                     int lru = cacheEntries[idx][i].getLRU();
 
@@ -178,7 +185,7 @@ public class L2Cache {
                     if (currentLRU == -1){
                         //do nothing
                     }
-                    else if (currentLRU < valueLRU){
+                    else if (currentLRU < valueLRU && currentLRU != -1){
                         ce.updateLRU(currentLRU + 1);
                     }
                 }
@@ -210,7 +217,7 @@ public class L2Cache {
         }
         //compare to filled size of cache
         if (max != filledCache){
-            System.out.println("Max value of LRU is different than the filled cache variable.");
+            //System.out.println("Max value of LRU is different than the filled cache variable.");
         }
     }
 
@@ -250,7 +257,7 @@ public class L2Cache {
      */
     public boolean snoop(String instruction){
         for (int i = 0; i< cols; i++){
-            if (i % associativity == 0 && cacheEntries[indexes][i].getTag() == getTag(instruction)){
+            if (i % blockSize == 0 && cacheEntries[getIndex(instruction)][i].getTag() == getTag(instruction)){
                 return true;
             }
         }
@@ -261,32 +268,37 @@ public class L2Cache {
         //offset, bytes per block log(bytes per block)
         //index, log(rows)
         //tag = remaining
-        int offsetBits = (int) Math.log((int) blockSize);
-        int indexBits = (int) Math.log(indexes);
+        int offsetBits = (int) (Math.log((int) blockSize)/Math.log(2));
+        int indexBits = (int) (Math.log(indexes)/Math.log(2));
         int tag = instruction.length() - (offsetBits + indexBits);
+        //System.out.println(tag+" , "+indexBits+" , "+offsetBits);
 
         //type: 1-tag, 2-index, 3-offset
         if (type == 1)
             return instruction.substring(0,tag);
         else if (type == 2)
-            return instruction.substring(tag,offsetBits);
+            return instruction.substring(tag,instruction.length()-offsetBits);
         else
             return instruction.substring(tag+indexBits);
     }
 
     public int getTag(String instruction){
         //tag = (memory word address)/(cache size in words)
-        //cache size in words = size(bytes)/2
+        //cache size in words = size(bytes)/2\
+        //System.out.println(parseBits(instruction,1));
         return toDecimal(parseBits(instruction,1));
     }
 
     public int getBlockOffset(String instruction){
         //block offset = (word index)%(block size)
+        //System.out.println(parseBits(instruction,3));
         return toDecimal(parseBits(instruction,3));
     }
 
     public int getIndex(String instruction){
         //block index = (word index)/(block size)
+        //System.out.print(parseBits(instruction,2)+", ");
+        //System.out.println(toDecimal(parseBits(instruction,2)));
         return toDecimal(parseBits(instruction, 2));
     }
 
@@ -298,8 +310,33 @@ public class L2Cache {
      */
     public int toDecimal(String binary){
         //will check to see if the number starts with a 1, will add 0 to get positive value
+        StringBuilder s = new StringBuilder();
         if (binary.charAt(0) == '1')
-            binary = '0'+binary;
-        return Integer.getInteger(binary, 2);
+            s.append('0');
+        s.append(binary);
+        return Integer.parseInt(s.toString(), 2);
+    }
+
+    public String toString(){
+        StringBuilder s = new StringBuilder();
+
+        for (int i = 0; i < indexes; i++){
+            for (int j = 0; j<cols; j++){
+                if (j % blockSize == 0){
+                    String inst = cacheEntries[i][j].getInstruction();
+                    if (inst != null)
+                        s.append(inst);
+                    else
+                        s.append("Null");
+                    s.append(" --> ");
+                    s.append(cacheEntries[i][j].getLRU());
+                    if (j != cols - blockSize)
+                        s.append("  |  ");
+                    else
+                        s.append("\n");
+                }
+            }
+        }
+        return s.toString();
     }
 }

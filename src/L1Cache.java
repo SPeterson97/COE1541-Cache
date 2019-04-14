@@ -36,10 +36,13 @@ public class L1Cache {
         this.filledCache = 0;
 
         //check if associativity is too great for this component
-        double totalEntries = size/blockSize;
-        indexes= (int) (totalEntries/associativity);
-        cols = size/indexes;
+        double totalEntries = this.size/this.blockSize;
+        indexes = (int) (totalEntries/this.associativity);
+        cols = (int) this.size/indexes;
         cacheEntries = new CacheEntry[indexes][cols];
+
+        //System.out.println(indexes);
+        //System.out.println(this.blockSize);
 
         //initialize all entries
         for(int i = 0; i < indexes; i++) {
@@ -63,20 +66,24 @@ public class L1Cache {
         int instructionTag = getTag(instruction);
 
         if (snoop(instruction)){
+            System.out.println("Hit");
             //if already in cache, return latency, update LRU and move on
             for (int i = 0; i< cols; i++){
-                if ( i % associativity == 0 && cacheEntries[index][i].getTag() == instructionTag){
+                if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == instructionTag){
                     //get lru
                     int lru = cacheEntries[index][i].getLRU();
 
                     //update lru
                     updateLRU(lru, 0);
+                    if(cacheEntries[index][i].getLRU() != -1)
+                        cacheEntries[index][i].updateLRU(0);
 
-                    return latency;
+                    return 2*latency;
                 }
             }
         }
         else {
+            System.out.println("Miss");
             //see if the instruction is in L2Cache
             int latencyL2 = L2.read(instruction);
 
@@ -95,7 +102,7 @@ public class L1Cache {
             //replace the blocks
             replace(cacheEntries[index], idx, instruction, false);
 
-            return latency + latencyL2;
+            return (2*latency) + latencyL2;
         }
         //should ever reach here
         return -1;
@@ -108,70 +115,73 @@ public class L1Cache {
      * @return
      */
     public int write(String instruction){
+        int latency1 = 0;
         if (writePolicy == WRITE_BACK){
-			latency = writeBack(instruction);
+			latency1 = writeBack(instruction);
         }
         else if (writePolicy == WRITE_THROUGH){
-			latency = writeThrough(instruction);
+			latency1 = writeThrough(instruction);
         }
         else if (writePolicy == WRITE_EVICT){
-			latency = writeEvict(instruction);
+			latency1 = writeEvict(instruction);
         }
 
-        return latency;
+        return latency1;
     }
 
     private int writeBack(String instruction){
 		
-        int idx = getIndex(instruction);
+        int index = getIndex(instruction);
         int tag = getTag(instruction);
 		
 		//check for miss then hit, then write based on allocationPolicy
 		if(!snoop(instruction)) {
+            int l = 0;
 			if(this.allocationPolicy == 1) {
 				//write allocate miss - update main mem and bring block to cache
 				
 				//go to "mem"
-				
-				//value needs to be written back to L1
-				for (int i = 0; i < cols; i++) {
-					if ( i % associativity == 0 ){
-						//get current LRU value
-						int lru = cacheEntries[idx][i].getLRU();
 
-						//found the match, need to evict
-						replace(cacheEntries[idx], i, instruction, true);
+                //see if the instruction is in L2Cache
+                //int latencyL2 = L2.read(instruction);
 
-						//need to update the LRU
-						updateLRU(lru, -1);
+                //find the next block to replace
+                l = read(instruction);
 
-						//no write to L2, on different pages
-						return latency;
-					}
-				}
+                //go through new blocks and increment the number of writes
+                for (int i = 0; i<cols; i++){
+                    if (cacheEntries[index][i].getLRU() == 0){
+                        cacheEntries[index][i].write();
+                        cacheEntries[index][i].updateDirtyBit(1);
+                    }
+                }
 			}
+			return l;
 		}
 		else {
 			//write allocate hit - writes to cache setting dirty bit, main mem not updated
 			//non write allocate hit - writes to cache setting dirty bit, main mem not updated
 			//only update L2 if evicting data
-			
-			for (int i = 0; i < cols; i++) {
-				if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
-					//get current LRU value
-					int lru = cacheEntries[idx][i].getLRU();
 
-					//found the match, need to write through to L2
-					replace(cacheEntries[idx], i, instruction, false);
+            //go through new blocks and increment the number of writes
+            int lru =-1;
+            for (int i = 0; i<cols; i++){
+                if (cacheEntries[index][i].getTag() == tag){
+                    lru = cacheEntries[index][i].getLRU();
+                    cacheEntries[index][i].write();
+                    cacheEntries[index][i].updateDirtyBit(1);
+                }
+            }
 
-					//need to update the LRU
-					updateLRU(lru, 0);
+            //update other LRU values
+            updateLRU(lru,0);
 
-					//need write back to L2 cache as well
-					//existing data - tell L2 were evicting
-					return latency + L2.write(instruction);
-				}
-			}
+            for (int i = 0; i<cols; i++){
+                if (cacheEntries[index][i].getTag() == tag){
+                    cacheEntries[index][i].updateLRU(0);
+                }
+            }
+            return 2*latency;
 		}
     }
 
@@ -196,7 +206,7 @@ public class L1Cache {
 			//non write allocate hit - write to cache and main mem
 			
 			for (int i = 0; i < cols; i++) {
-				if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+				if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
 					//get current LRU value
 					int lru = cacheEntries[idx][i].getLRU();
 
@@ -213,6 +223,7 @@ public class L1Cache {
 			}
 
 		}
+		return -1;
     }
 
     private int writeEvict(String instruction){
@@ -222,7 +233,7 @@ public class L1Cache {
         if (snoop(instruction)) {
             //value is in this cache, possibly in L2 as well
             for (int i = 0; i < cols; i++) {
-                if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+                if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
                     //get current LRU value
                     int lru = cacheEntries[idx][i].getLRU();
 
@@ -264,7 +275,7 @@ public class L1Cache {
                         max = ce.getLRU();
 
                     //don't update a non-used block
-                    if (currentLRU < valueLRU){
+                    if (currentLRU < valueLRU && currentLRU != -1){
                         ce.updateLRU(currentLRU + 1);
                     }
                 }
@@ -297,7 +308,7 @@ public class L1Cache {
         }
         //compare to filled size of cache
         if (max != filledCache){
-            System.out.println("Max value of LRU is different than the filled cache variable.");
+            //System.out.println("Max value of LRU is different than the filled cache variable.");
         }
     }
 
@@ -310,10 +321,10 @@ public class L1Cache {
         int maxLRU = -1;
         int index = -1;
         for (int i = 0; i < cacheRow.length; i++){
-            if (i % associativity == 0 && cacheRow[i].getLRU() == -1){
+            if (i % blockSize == 0 && cacheRow[i].getLRU() == -1){
                 return i;
             }
-            else if(i % associativity == 0 && cacheRow[i].getLRU() > maxLRU){
+            else if(i % blockSize == 0 && cacheRow[i].getLRU() > maxLRU){
                 maxLRU = cacheRow[i].getLRU();
                 index = i;
             }
@@ -330,6 +341,7 @@ public class L1Cache {
      * @param evict
      */
     private void replace(CacheEntry[] cacheRow, int index, String instruction, boolean evict){
+        int lat = 0;
         for(int i = index; i< index+blockSize; i++){
             if (evict){
                 //replace the spot with empty space
@@ -353,7 +365,8 @@ public class L1Cache {
      */
     public boolean snoop(String instruction){
         for (int i = 0; i< cols; i++){
-            if (i % associativity == 0 && cacheEntries[indexes][i].getTag() == getTag(instruction)){
+            //System.out.println(cacheEntries[getIndex(instruction)][i].getTag()+ " , "+getTag(instruction));
+            if (i % blockSize == 0 && cacheEntries[getIndex(instruction)][i].getTag() == getTag(instruction)){
                 return true;
             }
         }
@@ -372,15 +385,16 @@ public class L1Cache {
         //offset, bytes per block log(bytes per block)
         //index, log(rows)
         //tag = remaining
-        int offsetBits = (int) Math.log((int) blockSize);
-        int indexBits = (int) Math.log(indexes);
+        int offsetBits = (int) (Math.log((int) blockSize)/Math.log(2));
+        int indexBits = (int) (Math.log(indexes)/Math.log(2));
         int tag = instruction.length() - (offsetBits + indexBits);
+        //System.out.println(tag+" , "+indexBits+" , "+offsetBits);
 
         //type: 1-tag, 2-index, 3-offset
         if (type == 1)
             return instruction.substring(0,tag);
         else if (type == 2)
-            return instruction.substring(tag,offsetBits);
+            return instruction.substring(tag,instruction.length()-offsetBits);
         else
             return instruction.substring(tag+indexBits);
     }
@@ -388,16 +402,19 @@ public class L1Cache {
     public int getTag(String instruction){
         //tag = (memory word address)/(cache size in words)
         //cache size in words = size(bytes)/2
+        //System.out.println("Tag: "+parseBits(instruction,1));
         return toDecimal(parseBits(instruction,1));
     }
 
     public int getBlockOffset(String instruction){
         //block offset = (word index)%(block size)
+        //System.out.println("Offset: "+parseBits(instruction,3));
         return toDecimal(parseBits(instruction,3));
     }
 
     public int getIndex(String instruction){
         //block index = (word index)/(block size)
+        //System.out.println("Index:"+parseBits(instruction,2));
         return toDecimal(parseBits(instruction, 2));
     }
 
@@ -414,6 +431,29 @@ public class L1Cache {
             s.append('0');
         s.append(binary);
         return Integer.parseInt(s.toString(), 2);
+    }
+
+    public String toString(){
+        StringBuilder s = new StringBuilder();
+
+        for (int i = 0; i < indexes; i++){
+            for (int j = 0; j<cols; j++){
+                if (j % blockSize == 0){
+                    String inst = cacheEntries[i][j].getInstruction();
+                    if (inst != null)
+                        s.append(inst);
+                    else
+                        s.append("Null");
+                    s.append(" --> ");
+                    s.append(cacheEntries[i][j].getLRU());
+                    if (j != cols - blockSize)
+                        s.append("  |  ");
+                    else
+                        s.append("\n");
+                }
+            }
+        }
+        return s.toString();
     }
 
     /**

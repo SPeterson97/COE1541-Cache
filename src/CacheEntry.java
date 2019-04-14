@@ -16,7 +16,7 @@ public class CacheEntry {
 		this.validBit = 0;
 		this.dirtyBit = 0;
 		this.index = 0;
-		this.tag = 0;
+		this.tag = -1;
 		this.LRU = -1;
 		this.writes = 0;
 		this.blocked = false;
@@ -54,7 +54,7 @@ public class CacheEntry {
 	}
 	
 	public void updateValidBit(int vb) {
-		this.validBit = validBit;
+		this.validBit = vb;
 	}
 	
 	public int getDirtyBit() {
@@ -62,7 +62,7 @@ public class CacheEntry {
 	}
 	
 	public void updateDirtyBit(int db) {
-		this.dirtyBit = dirtyBit;
+		this.dirtyBit = db;
 	}
 	
 	public int getIndex() {
@@ -74,11 +74,11 @@ public class CacheEntry {
 	}
 	
 	public int getTag() {
-		return this.index;
+		return this.tag;
 	}
 	
 	public void updateTag(int tag) {
-		this.tag = index;
+		this.tag = tag;
 	}
 
 	public int getLRU(){

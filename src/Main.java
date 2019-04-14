@@ -37,6 +37,7 @@ public class Main {
             }
             catch (Exception e){
                 System.out.println("Problem with preset values");
+                System.out.println(e);
             }
         }
         else
@@ -52,9 +53,9 @@ public class Main {
         L2.setL1(L1);
 
         //get file to process
-        System.out.println("Please enter the filename of cache accesses: ");
-        String filename = in.nextLine();
-        System.out.println("");
+        //System.out.println("Please enter the filename of cache accesses: ");
+        String filename = "test1.txt";//in.nextLine();
+        //System.out.println("");
 
         //try to open file
         File newFile = null;
@@ -70,16 +71,30 @@ public class Main {
 
         //variable to store total cycles
         double totalCycles = 0;
+        int run = 1;
 
         //run collection of read/writes
-        while (inFile.hasNextLine()){
+        while (inFile.hasNextLine() && run < 11){
             //read in next line and get address (binary) and type(0 = load, 1 = write)
             String line = inFile.nextLine();
             int type = getType(line);
             String instruction = getInstruction(line);
 
+            if (type == 0)
+                totalCycles += L1.read(instruction);
+            else
+                totalCycles += L1.write(instruction);
+
+
+            System.out.println(run+". L1 Cache: ");
+            System.out.println(L1.toString());
+            System.out.println("L2 Cache: ");
+            System.out.println(L2.toString());
+            System.out.println("");
+            run++;
 
         }
+        System.out.println("Total Cycles: "+totalCycles);
     }
 
     /**
@@ -89,7 +104,7 @@ public class Main {
      */
     public static int getType(String line){
         String[] temp = line.split(" ");
-        if (temp[0].equals("load"))
+        if (temp[0].equals("read"))
             return 0;
         else if (temp[0].equals("write"))
             return 1;
@@ -245,26 +260,45 @@ public class Main {
         int i = 0;
         while(in.hasNextLine()){
             String line = in.nextLine();
-            if (i == 0)
+            if (i == 0){
                 sizeL1 = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 1)
+                System.out.println("Size L1: "+sizeL1);
+            }
+            else if (i == 1) {
                 sizeL2 = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 2)
+                System.out.println("Size L2: "+sizeL2);
+            }
+            else if (i == 2) {
                 latencyL1 = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 3)
+                System.out.println("Latency L1: "+latencyL1);
+            }
+            else if (i == 3) {
                 latencyL2 = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 4)
+                System.out.println("Latency L2: "+latencyL2);
+            }
+            else if (i == 4) {
                 blockSize = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 5)
+                System.out.println("Blocksize: "+blockSize);
+            }
+            else if (i == 5) {
                 associativity = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 6)
+                System.out.println("Associativity: "+associativity);
+            }
+            else if (i == 6) {
                 writePolicy = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 7)
+                System.out.println("Write Policy: "+writePolicy);
+            }
+            else if (i == 7) {
                 allocationPolicy = Integer.parseInt(line.split(" ")[1]);
-            else if (i == 8)
+                System.out.println("Allocation: "+allocationPolicy);
+            }
+            else if (i == 8) {
                 outstandingMisses = Integer.parseInt(line.split(" ")[1]);
+                System.out.println("Misses: "+outstandingMisses);
+            }
             i++;
         }
+
     }
 
     /**
@@ -272,7 +306,7 @@ public class Main {
      * @param num
      * @return String of binary
      */
-    public String toBinary(int num){
+    public static String toBinary(int num){
         StringBuilder result = new StringBuilder();
 
         while(num > 0) {
