@@ -62,6 +62,29 @@ public class L1Cache {
         int index = getIndex(instruction);
         int instructionTag = getTag(instruction);
 
+        if (snoop(instruction)){
+            //if already in cache, return latency, update LRU and move on
+            for (int i = 0; i< cols; i++){
+                if ( i % associativity == 0 && cacheEntries[getIndex(instruction)][i].getTag() == getTag(instruction)){
+                    //get lru
+                    int lru = cacheEntries[getIndex(instruction)][i].getLRU();
+
+                    //update lru
+                    updateLRU(lru, 0);
+                }
+            }
+
+        }
+        else if (L2.snoop(instruction)){
+            //see if the instruction is in L2Cache
+        }
+        else{
+            //not in L1 or L2. Must write from memory
+        }
+
+
+
+
         if (associativity == 0){
             //compare when only col = 0;
             //make sure data is consistent across blocks
@@ -256,7 +279,7 @@ public class L1Cache {
     private int writeEvict(String instruction){
         int idx = getIndex(instruction);
         int tag = getTag(instruction);
-                
+
         if (snoop(instruction)) {
             //value is in this cache, possibly in L2 as well
             for (int i = 0; i < cols; i++) {
@@ -279,6 +302,7 @@ public class L1Cache {
             //need to check L2 as well. If not there, just write to mem
             return latency + L2.write(instruction);
         }
+        return -1;
     }
 
     /**
@@ -374,6 +398,10 @@ public class L1Cache {
             }
             else{
                 cacheRow[i] = new CacheEntry(instruction, i - index);
+                cacheRow[i].updateValidBit(1);
+                cacheRow[i].updateIndex(index);
+                cacheRow[i].updateTag(getTag(instruction));
+                cacheRow[i].updateLRU(0);
             }
         }
     }
