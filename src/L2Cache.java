@@ -55,68 +55,46 @@ public class L2Cache {
      * @return
      */
     public int read(String instruction){
-        //check the appropriate index in each SA block.
-        //there's only going to be a read when there is a L1 miss
-        //if associativity = 1, look at col = 0
-        //if associativity > 1, look at col % associativity == 0
-        int index = getWordIndex(instruction);
+        //get useful info
+        int index = getIndex(instruction);
         int instructionTag = getTag(instruction);
 
-        if (associativity == 0){
-            //compare when only col = 0;
-            //make sure data is consistent across blocks
-            if ( cacheEntries[index][0].tagEquals(instructionTag) ){
-                //tags are equal, so cache hit
-                //update LRU
-                updateLRU(cacheEntries[index][0].getLRU(),READ_REPLACE);
+        //check if it is in L2
+        if (snoop(instruction)){
+            //it is in L2, will only need to update LRU and return latency
+            for (int i = 0; i< cols; i++){
+                if ( i % associativity == 0 && cacheEntries[index][i].getTag() == instructionTag){
+                    //get lru value of block to replace
+                    int lru = cacheEntries[index][i].getLRU();
 
-                //set all blocks in that row to have LRU of 0
-                for (int i = 0; i < blockSize; i++){
-                    cacheEntries[index][i].updateLRU(READ_REPLACE);
-                }
-                //return time to complete read and send data to L1
-                //send data here
-                return latency;
-            }
-            else{
-                //L2 miss, get from memory
-                //write the new value to L2
-                this.write(instruction);
+                    //update lru
+                    updateLRU(lru, 0);
 
-                //return latency plus the latency of the next level
-                return latency + (latency + 100);
-            }
-        }
-        else{
-            //need to only read first in each way of associativity
-            //need to check cols that satisfy col % associativity == 0
-            //iterate through the cols
-            for (int i = 0; i < cols; i++){
-                if (i % associativity == 0){
-                    //check tags
-                    if( cacheEntries[index][i].getTag() == instructionTag ){
-                        //match, L2 cache hit
-                        //update LRU
-                        updateLRU(cacheEntries[index][i].getLRU(),READ_REPLACE);
-
-                        //set all blocks in that row to have LRU of 0
-                        for (int j = 0; i < blockSize; i++){
-                            cacheEntries[index][j].updateLRU(READ_REPLACE);
-                        }
-                        //return time to complete read
-                        return latency;
-                    }
+                    return latency;
                 }
             }
-
-            //no match was found
-            //L2 miss, go to memory
-            //write the new data into memory
-            this.write(instruction);
-
-            //now return latency for going to L2 and memory
-            return latency + (latency + 100);
         }
+        else {
+            //not in L2, must go to memory
+            //find the next block to replace
+            int idx = L1.nextEvict(cacheEntries[index]);
+
+            //replace the block at the found index
+            int lru = cacheEntries[index][idx].getLRU();
+
+            //need to update lru of L2
+            int action = 0;
+            if (lru == -1)
+                action = 1;
+            updateLRU(lru, action);
+
+            //replace the blocks
+            replace(cacheEntries[index], idx, instruction, false);
+
+            return latency + 100;
+        }
+        //should ever reach here
+        return -1;
     }
 
     /**
@@ -148,7 +126,34 @@ public class L2Cache {
     }
 
     public int writeEvict(String instruction){
-        return 0;
+        //get index of instruction to evict
+        int idx = getIndex(instruction);
+        int tag = getTag(instruction);
+
+        if (snoop(instruction)) {
+            //value is in this cache, possibly in L2 as well
+            for (int i = 0; i < cols; i++) {
+                if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+                    //get current LRU value
+                    int lru = cacheEntries[idx][i].getLRU();
+
+                    //need to update the LRU
+                    updateLRU(lru, -1);
+
+                    //found the match, need to evict
+                    replace(cacheEntries[idx], i, instruction, true);
+
+                    //will need to go to memory too to write
+                    return latency + 100;
+                }
+            }
+        }
+        else{
+            //not in l2, just need to write to memory
+            return latency + 100;
+        }
+        //shouldn't reach here
+        return -1;
     }
 
     /**
@@ -206,6 +211,30 @@ public class L2Cache {
         //compare to filled size of cache
         if (max != filledCache){
             System.out.println("Max value of LRU is different than the filled cache variable.");
+        }
+    }
+
+    /**
+     * Use this function to replace a block of cache with new cache entries
+     * If evict is true, then we are just replacing the block with an empty cache entry
+     * @param cacheRow
+     * @param index
+     * @param instruction
+     * @param evict
+     */
+    private void replace(CacheEntry[] cacheRow, int index, String instruction, boolean evict){
+        for(int i = index; i< index+blockSize; i++){
+            if (evict){
+                //replace the spot with empty space
+                cacheRow[i] = new CacheEntry(null, 0);
+            }
+            else{
+                cacheRow[i] = new CacheEntry(instruction, i - index);
+                cacheRow[i].updateValidBit(1);
+                cacheRow[i].updateIndex(index);
+                cacheRow[i].updateTag(getTag(instruction));
+                cacheRow[i].updateLRU(0);
+            }
         }
     }
 

@@ -65,9 +65,9 @@ public class L1Cache {
         if (snoop(instruction)){
             //if already in cache, return latency, update LRU and move on
             for (int i = 0; i< cols; i++){
-                if ( i % associativity == 0 && cacheEntries[getIndex(instruction)][i].getTag() == getTag(instruction)){
+                if ( i % associativity == 0 && cacheEntries[index][i].getTag() == instructionTag){
                     //get lru
-                    int lru = cacheEntries[getIndex(instruction)][i].getLRU();
+                    int lru = cacheEntries[index][i].getLRU();
 
                     //update lru
                     updateLRU(lru, 0);
@@ -79,22 +79,21 @@ public class L1Cache {
         else {
             //see if the instruction is in L2Cache
             int latencyL2 = L2.read(instruction);
-            int id = getIndex(instruction);
 
             //find the next block to replace
-            int idx = nextEvict(cacheEntries[id]);
+            int idx = nextEvict(cacheEntries[index]);
 
             //replace the block at the found index
-            int lru = cacheEntries[id][idx].getLRU();
-
-            //replace the blocks
-            replace(cacheEntries[id], idx, instruction, false);
+            int lru = cacheEntries[index][idx].getLRU();
 
             //need to update lru of L1
             int action = 0;
             if (lru == -1)
                 action = 1;
             updateLRU(lru, action);
+
+            //replace the blocks
+            replace(cacheEntries[index], idx, instruction, false);
 
             return latency + latencyL2;
         }
@@ -252,11 +251,11 @@ public class L1Cache {
                     //get current LRU value
                     int lru = cacheEntries[idx][i].getLRU();
 
-                    //found the match, need to evict
-                    replace(cacheEntries[idx], i, instruction, true);
-
                     //need to update the LRU
                     updateLRU(lru, -1);
+
+                    //found the match, need to evict
+                    replace(cacheEntries[idx], i, instruction, true);
 
                     //need write evict from L2 cache as well
                     return latency + L2.write(instruction);
@@ -332,7 +331,7 @@ public class L1Cache {
      * index.
      * @return
      */
-    private int nextEvict(CacheEntry[] cacheRow){
+    protected int nextEvict(CacheEntry[] cacheRow){
         int maxLRU = -1;
         int index = -1;
         for (int i = 0; i < cacheRow.length; i++){
