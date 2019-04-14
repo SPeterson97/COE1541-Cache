@@ -124,121 +124,96 @@ public class L1Cache {
 
     private int writeBack(String instruction){
 		
-        int blockIndex = getIndex(instruction);
-		int blockCol = (blockIndex % this.blockSize);
-		int tag = getTag(instruction);
-		
-		CacheEntry newData = new CacheEntry(instruction);
-		CacheEntry currData = cacheEntries[blockIndex][blockCol];
+        int idx = getIndex(instruction);
+        int tag = getTag(instruction);
 		
 		//check for miss then hit, then write based on allocationPolicy
-		if(tag != currData.tag || currData.validBit == 0) {
+		if(!snoop(instruction)) {
 			if(this.allocationPolicy == 1) {
 				//write allocate miss - update main mem and bring block to cache
 				
-				if(currData.validBit == 0) {
-					//no data, adding to cache - not in cache
-					updateLRU(0, 1);
-					newData.updateLRU(0);
+				//go to "mem"
+				
+				//value needs to be written back to L1
+				for (int i = 0; i < cols; i++) {
+					if ( i % associativity == 0 ){
+						//get current LRU value
+						int lru = cacheEntries[idx][i].getLRU();
+
+						//found the match, need to evict
+						replace(cacheEntries[idx], i, instruction, true);
+
+						//need to update the LRU
+						updateLRU(lru, -1);
+
+						//no write to L2, on different pages
+						return latency;
+					}
 				}
-				else {
-					//data, replacing existing block
-					updateLRU(currData.getLRU(), 0);
-					newData.updateLRU(0);
-				}
-	
-				newData.write();
-				newData.dirtyBit = 1;
-				//write to L2 - call read
-				cacheEntries[blockIndex][blockCol] = newData;
-			}
-			else if(this.allocationPolicy == 2) {
-				//non write allocate miss - update main mem, NOT bring block to cache
-				//update L2 ?
 			}
 		}
-		else if(tag == currData.tag && currData.validBit == 1) {
+		else {
 			//write allocate hit - writes to cache setting dirty bit, main mem not updated
 			//non write allocate hit - writes to cache setting dirty bit, main mem not updated
+			//only update L2 if evicting data
 			
-			if(currData.validBit == 0) {
-				//no data, adding to cache - not in cache
-				updateLRU(0, 1);
-				newData.updateLRU(0);
-			}
-			else {
-				//data, replacing existing block
-				updateLRU(currData.getLRU(), 0);
-				newData.updateLRU(0);
-			}
-			
-			newData.write();
-			newData.dirtyBit = 1;
+			for (int i = 0; i < cols; i++) {
+				if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+					//get current LRU value
+					int lru = cacheEntries[idx][i].getLRU();
 
-			//call update LRU
-			cacheEntries[blockIndex][blockCol] = newData;
+					//found the match, need to write through to L2
+					replace(cacheEntries[idx], i, instruction, false);
+
+					//need to update the LRU
+					updateLRU(lru, 0);
+
+					//need write back to L2 cache as well
+					//existing data - tell L2 were evicting
+					return latency + L2.write(instruction);
+				}
+			}
 		}
-		
-        return latency;
     }
 
     private int writeThrough(String instruction){
 		
-		int blockIndex = getIndex(instruction);
-		int blockCol = (blockIndex % this.blockSize);
-		int tag = getTag(instruction);
-		
-		CacheEntry newData = new CacheEntry(instruction);
-		CacheEntry currData = cacheEntries[blockIndex][blockCol];
+		int idx = getIndex(instruction);
+        int tag = getTag(instruction);
 		
 		//check for miss then hit, then write based on allocationPolicy
-		if(tag != currData.tag || currData.validBit == 0) {
+		if(!snoop(instruction)) {
 			if(this.allocationPolicy == 1) {
 				//write allocate miss - updates block in mem and brings back to cache
-				
-				/*if(currData.validBit == 0) {
-					//no data, adding to cache - not in cache
-					updateLRU(0, 1);
-					newData.updateLRU(0);
-				}
-				else {
-					//data, replacing existing block
-					updateLRU(currData.getLRU(), 0);
-					newData.updateLRU(0);
-				}
-	
-				newData.write();
-				newData.dirtyBit = -1;
-				//write to L2 - call read
-				cacheEntries[blockIndex][blockCol] = newData;*/
 			}
 			else if(this.allocationPolicy == 2) {
 				//non write allocate miss - update main mem not bringing back to cache
 			}
+			
+			return latency;
 		}
-		else if(tag == currData.tag && currData.validBit == 1) {
+		else {
 			//write allocate hit - write to cache and main mem
 			//non write allocate hit - write to cache and main mem
 			
-			if(currData.validBit == 0) {
-				//no data, adding to cache - not in cache
-				updateLRU(0, 1);
-				newData.updateLRU(0);
+			for (int i = 0; i < cols; i++) {
+				if ( i % associativity == 0 && cacheEntries[idx][i].getTag() == tag){
+					//get current LRU value
+					int lru = cacheEntries[idx][i].getLRU();
+
+					//found the match, need to write through to L2
+					replace(cacheEntries[idx], i, instruction, false);
+
+					//need to update the LRU
+					updateLRU(lru, 0);
+
+					//need write through L2 cache as well
+					//write through to memory as well
+					return latency + L2.write(instruction);
+				}
 			}
-			else {
-				//data, replacing existing block
-				updateLRU(currData.getLRU(), 0);
-				newData.updateLRU(0);
-			}
-			
-			newData.write();
-			newData.dirtyBit = -1;
-			//write to L2 as well
-			cacheEntries[blockIndex][blockCol] = newData;
+
 		}
-		
-		
-        return latency;
     }
 
     private int writeEvict(String instruction){
