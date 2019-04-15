@@ -79,25 +79,31 @@ public class L2Cache {
             }
         }
         else {
-            System.out.println("Miss");
-            //not in L2, must go to memory
+            System.out.println("L2 Miss");
+            int lat = 0;
+
             //find the next block to replace
             int idx = L1.nextEvict(cacheEntries[index]);
+            boolean writeDataBack = (cacheEntries[index][idx].getDirtyBit() == 1) && writePolicy == WRITE_BACK;
+
+            if (writeDataBack){
+                //Need to write the stale data back to memory
+                lat += 100;
+            }
 
             //replace the block at the found index
             int lru = cacheEntries[index][idx].getLRU();
 
-            //need to update lru of L2
+            //need to update lru of L1
             int action = 0;
             if (lru == -1)
                 action = 1;
             updateLRU(lru, action);
 
-            System.out.println("Writing to L1");
             //replace the blocks
             replace(cacheEntries[index], idx, instruction, false);
 
-            return latency + 100;
+            return latency + 100 + lat;
         }
         //should ever reach here
         return -1;
@@ -124,8 +130,30 @@ public class L2Cache {
     }
 
     public int writeBack(String instruction){
-        System.out.println("YOU DONE FUCKED UP");
-        return 0;
+        //use this in the case when L2 needs to be written to on a L1 write back miss
+        //but a hit in L2
+        int index = getIndex(instruction);
+        int tag = getTag(instruction);
+
+        //go through new blocks and increment the number of writes
+        int lru =-1;
+        for (int i = 0; i<cols; i++){
+            if (cacheEntries[index][i].getTag() == tag){
+                lru = cacheEntries[index][i].getLRU();
+                cacheEntries[index][i].write();
+                cacheEntries[index][i].updateDirtyBit(1);
+            }
+        }
+
+        //update other LRU values
+        updateLRU(lru,0);
+
+        for (int i = 0; i<cols; i++){
+            if (cacheEntries[index][i].getTag() == tag){
+                cacheEntries[index][i].updateLRU(0);
+            }
+        }
+        return latency;
     }
 
     public int writeThrough(String instruction){

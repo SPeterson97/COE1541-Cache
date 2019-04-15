@@ -83,12 +83,21 @@ public class L1Cache {
             }
         }
         else {
-            System.out.println("Miss");
-            //see if the instruction is in L2Cache
-            int latencyL2 = L2.read(instruction);
+            System.out.println("L1 Miss");
+            int latencyL2 = 0;
 
             //find the next block to replace
             int idx = nextEvict(cacheEntries[index]);
+            boolean writeDataBack = (cacheEntries[index][idx].getDirtyBit() == 1) && writePolicy == WRITE_BACK;
+            boolean inL2 = L2.snoop(instruction);
+
+            if (writeDataBack && inL2){
+                //if the data needs to be written back and is in L2
+                latencyL2 += L2.write(cacheEntries[index][idx].getInstruction());
+            }
+
+            //see if you can read in the data
+            latencyL2 += L2.read(instruction);
 
             //replace the block at the found index
             int lru = cacheEntries[index][idx].getLRU();
