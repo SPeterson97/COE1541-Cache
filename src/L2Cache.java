@@ -157,7 +157,43 @@ public class L2Cache {
     }
 
     public int writeThrough(String instruction){
-        return  0;
+        //get index of instruction to evict
+        int idx = getIndex(instruction);
+        int tag = getTag(instruction);
+
+        if (snoop(instruction)) {
+            //value is in this cache
+            for (int i = 0; i < cols; i++) {
+                if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
+
+                    int lru =-1;
+                    for (int j = 0; j<cols; j++){
+                        if (cacheEntries[index][j].getTag() == tag){
+                            lru = cacheEntries[index][j].getLRU();
+                            cacheEntries[index][j].write();
+                        }
+                    }
+
+                    //update other LRU values
+                    updateLRU(lru,0);
+
+                    for (int j = 0; j<cols; j++){
+                        if (cacheEntries[index][j].getTag() == tag){
+                            cacheEntries[index][j].updateLRU(0);
+                        }
+                    }
+
+                    //will need to go to memory too to write
+                    return latency + 100;
+                }
+            }
+        }
+        else{
+            //not in l2, just need to write to memory
+            return latency + 100;
+        }
+        //shouldn't reach here
+        return -1;
     }
 
     public int writeEvict(String instruction){
