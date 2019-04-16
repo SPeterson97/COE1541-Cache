@@ -78,7 +78,7 @@ public class L1Cache {
                     if(cacheEntries[index][i].getLRU() != -1)
                         cacheEntries[index][i].updateLRU(0);
 
-                    return 2*latency;
+                    return latency;
                 }
             }
         }
@@ -111,7 +111,7 @@ public class L1Cache {
             //replace the blocks
             replace(cacheEntries[index], idx, instruction, false);
 
-            return (2*latency) + latencyL2;
+            return (latency) + latencyL2;
         }
         //should ever reach here
         return -1;
@@ -190,7 +190,7 @@ public class L1Cache {
                     cacheEntries[index][i].updateLRU(0);
                 }
             }
-            return 2*latency;
+            return latency;
 		}
     }
 
@@ -210,7 +210,7 @@ public class L1Cache {
                 lat = L2.write(instruction);
 			}
 			
-			return (2*latency)+lat;
+			return (latency)+lat;
 		}
 		else {
 			//write allocate hit - write to cache and main mem
@@ -238,7 +238,7 @@ public class L1Cache {
 
 					//need write through L2 cache as well
 					//write through to memory as well
-					return (2*latency) + L2.write(instruction);
+					return (latency) + L2.write(instruction);
 				}
 			}
 		}

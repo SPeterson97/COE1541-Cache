@@ -39,6 +39,8 @@ public class Main {
                 Scanner preset = new Scanner(new File("preset.txt"));
                 if (running == 1)
                     preset = new Scanner(new File("case1config.txt"));
+                if (running == 2)
+                    preset = new Scanner(new File("case2config.txt"));
 
                 dataCollection(preset,1);
             }
@@ -63,6 +65,8 @@ public class Main {
         String filename = "test1.txt";
         if (running == 1)
             filename = "case1.txt";
+        if (running == 2)
+            filename = "case2.txt";
 
         //try to open file
         File newFile = null;
@@ -100,6 +104,7 @@ public class Main {
             else
                 totalCycles += L1.write(instruction);
 
+            totalCycles++;
 
             System.out.println(run+". L1 Cache: ");
             System.out.println(L1.toString());
@@ -130,7 +135,7 @@ public class Main {
         int backup = 0;
 
         //go cycle by cycle
-        while (backup < 6){
+        while (notDone){
             cycles++;
             String currentInstruction = "";
             int type;
@@ -149,12 +154,14 @@ public class Main {
                         L1.read(readInstructions[index].getInstruction());
                     else
                         L2.write(readInstructions[index].getInstruction());
-                    System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
-                    System.out.println(" , Cycle: "+cycles);
+                    //System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
+                    //System.out.println(" , Cycle: "+cycles);
+                    System.out.println("Instruction number "+index+" is finishing at cycle: "+cycles);
                     backup--;
 
                     boolean readNext = next(cycles);
                     if (readNext) {
+                        //System.out.println("Reaches Here");
                         //0 = read, 1 = write
                         temp = in.nextLine();
                         currentInstruction = getInstruction(temp);
@@ -166,17 +173,23 @@ public class Main {
                         if (type == 0)
                             latency = dummyL1.read(currentInstruction);
                         else
-                            latency = dummyL2.write(currentInstruction);
+                            latency = dummyL1.write(currentInstruction);
+
+                        latency++;
+                        //System.out.println(currentInstruction);
+                        //System.out.println("Full: "+latency);
 
                         //put the instruction in the list of instructions read
-                        readInstructions[instructionCounter-1] = new CacheEntry(currentInstruction, 0);
-                        readInstructions[instructionCounter-1].tag = L1.getTag(currentInstruction);
-                        backup++;
+                        CacheEntry temp2 = new CacheEntry(currentInstruction, 0);
+                        temp2.tag = L1.getTag(currentInstruction);
 
                         //get the cycle which the instruction will finish at
-                        int newLat = waiting(latency, cycles, readInstructions, readInstructions[instructionCounter-1]);
-                        System.out.println("Latency: "+newLat);
-                        readInstructions[instructionCounter-1].cycles = newLat;
+                        int newLat = waiting(latency, cycles, readInstructions, temp2);
+                        System.out.println("Instruction "+(instructionCounter-1)+" will finish at: "+newLat);
+                        temp2.cycles = newLat;
+
+                        readInstructions[instructionCounter-1] = temp2;
+                        backup++;
 
                         //instruction is now in the buffer
                     }
@@ -186,8 +199,9 @@ public class Main {
                     //lets check if we get another cache access or not
                     //if we do, lets continue to push it off until we can remove one from our
                     //outstanding misses
-                    if (accesses[instructionCounter] == cycles) {
+                    if (instructionCounter < 14 && accesses[instructionCounter] == cycles) {
                         //oh no, we have to push it back because we would access it now
+                        //System.out.println(accesses[instructionCounter]);
                         accesses[instructionCounter]++;
                     }
                     else{
@@ -212,9 +226,10 @@ public class Main {
                     if (type == 0)
                         latency = dummyL1.read(currentInstruction);
                     else
-                        latency = dummyL2.write(currentInstruction);
-
-                    System.out.println(latency);
+                        latency = dummyL1.write(currentInstruction);
+                    latency++;
+                    //System.out.println("Latency1: "+latency);
+                    //System.out.println(latency);
 
                     //put the instruction in the list of instructions read
                     CacheEntry temp2 = new CacheEntry(currentInstruction, 0);
@@ -222,7 +237,7 @@ public class Main {
 
                     //get the cycle which the instruction will finish at
                     int newLat = waiting(latency, cycles, readInstructions, temp2);
-                    System.out.println("Latency: "+newLat);
+                    System.out.println("Instruction "+(instructionCounter-1)+" will finish at: "+newLat);
                     temp2.cycles = newLat;
 
                     readInstructions[instructionCounter-1] = temp2;
@@ -238,15 +253,16 @@ public class Main {
                         L1.read(readInstructions[index].getInstruction());
                     else
                         L2.write(readInstructions[index].getInstruction());
-                    System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
-                    System.out.println(" , Cycle: "+cycles);
+                    //System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
+                    //System.out.println(" , Cycle: "+cycles);
+                    System.out.println("Instruction number "+index+" is finishing at cycle: "+cycles);
                     backup--;
                 }
                 //dont need to process a command
             }
             notDone = !(instructionCounter == 14 && backup == 0);
         }
-        System.out.println(cycles);
+        System.out.println("Final Number of Cycles: "+cycles);
     }
 
     public static int waiting(int latency, int cycles, CacheEntry[] arr, CacheEntry entry){
@@ -298,7 +314,7 @@ public class Main {
     }
 
     public static boolean next(int cycles){
-        if (cycles == accesses[instructionCounter]){
+        if (instructionCounter < 14 && cycles >= accesses[instructionCounter]){
             //means that we need to read another instruction now
             instructionCounter++;
             return true;
