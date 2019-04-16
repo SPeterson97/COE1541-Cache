@@ -176,7 +176,7 @@ public class Main {
                             latency = dummyL1.write(currentInstruction);
 
                         latency++;
-                        //System.out.println(currentInstruction);
+                        //System.out.println("Latency1: "+dummyL2.latency);
                         //System.out.println("Full: "+latency);
 
                         //put the instruction in the list of instructions read
@@ -228,7 +228,7 @@ public class Main {
                     else
                         latency = dummyL1.write(currentInstruction);
                     latency++;
-                    //System.out.println("Latency1: "+latency);
+                    //System.out.println("Latency1: "+dummyL2.latency);
                     //System.out.println(latency);
 
                     //put the instruction in the list of instructions read

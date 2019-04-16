@@ -116,17 +116,18 @@ public class L2Cache {
      * @return
      */
     public int write(String instruction){
+        int lat = 0;
         if (writePolicy == WRITE_BACK){
-            latency = writeBack(instruction);
+            lat = writeBack(instruction);
         }
         else if (writePolicy == WRITE_THROUGH){
-            latency = writeThrough(instruction);
+            lat = writeThrough(instruction);
         }
         else if (writePolicy == WRITE_EVICT){
-            latency = writeEvict(instruction);
+            lat = writeEvict(instruction);
         }
 
-        return latency;
+        return lat;
     }
 
     public int writeBack(String instruction){
