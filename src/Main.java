@@ -10,7 +10,9 @@
 import javax.sound.midi.SysexMessage;
 import java.io.File;
 import java.nio.file.NoSuchFileException;
+import java.util.HashMap;
 import java.util.Scanner;
+import java.util.Set;
 
 public class Main {
 
@@ -23,9 +25,11 @@ public class Main {
     private static int writePolicy;
     private static int allocationPolicy;
     private static int outstandingMisses;
+    public static int instructionCounter = 0;
+    public static int[] accesses = {1, 10, 20, 30, 40, 50, 60,70, 80, 90, 100, 106, 110, 112};
 
 
-    public static void run(int mode){
+    public static void run(int mode, int running){
         //create scanner to read in data
         Scanner in = new Scanner(System.in);
 
@@ -33,6 +37,9 @@ public class Main {
         if (mode == 1){
             try {
                 Scanner preset = new Scanner(new File("preset.txt"));
+                if (running == 1)
+                    preset = new Scanner(new File("case1config.txt"));
+
                 dataCollection(preset,1);
             }
             catch (Exception e){
@@ -53,9 +60,9 @@ public class Main {
         L2.setL1(L1);
 
         //get file to process
-        //System.out.println("Please enter the filename of cache accesses: ");
-        String filename = "test1.txt";//in.nextLine();
-        //System.out.println("");
+        String filename = "test1.txt";
+        if (running == 1)
+            filename = "case1.txt";
 
         //try to open file
         File newFile = null;
@@ -69,12 +76,20 @@ public class Main {
             System.exit(0);
         }
 
+        if( running == 0)
+            sequential(inFile, L1, L2);
+        else
+            accessUnderMiss(inFile, L1, L2);
+
+    }
+
+    public static void sequential(Scanner inFile, L1Cache L1, L2Cache L2){
         //variable to store total cycles
         double totalCycles = 0;
         int run = 1;
 
         //run collection of read/writes
-        while (inFile.hasNextLine() && run < 11){
+        while (inFile.hasNextLine()){
             //read in next line and get address (binary) and type(0 = load, 1 = write)
             String line = inFile.nextLine();
             int type = getType(line);
@@ -95,6 +110,200 @@ public class Main {
 
         }
         System.out.println("Total Cycles: "+totalCycles);
+    }
+
+    public static void accessUnderMiss(Scanner in, L1Cache L1, L2Cache L2){
+        //Initialize L1 and L2 caches with information
+        L1Cache dummyL1 = new L1Cache(sizeL1, latencyL1, blockSize, associativity,
+                writePolicy, allocationPolicy, outstandingMisses);
+        L2Cache dummyL2 = new L2Cache(sizeL2, latencyL2, blockSize, associativity,
+                writePolicy, allocationPolicy, outstandingMisses);
+        //pass the L2 cache to L1, and L1 to L2
+        dummyL1.setL2(dummyL2);
+        dummyL2.setL1(dummyL1);
+
+        //initialize the run
+        int cycles = 0;
+        CacheEntry[] readInstructions = new CacheEntry[14];
+        int[] types = new int[14];
+        boolean notDone = true;
+        int backup = 0;
+
+        //go cycle by cycle
+        while (backup < 6){
+            cycles++;
+            String currentInstruction = "";
+            int type;
+            String temp;
+
+            //check to see if we can service any requests
+            if (backup == outstandingMisses){
+                //can't add anything else to the back up, need to see if we can execute a command
+                // or if not, then store it in the back up (if need to read another command).
+
+                //check if an instruction needs to be processed
+                int index = process(cycles, readInstructions);
+                if (index != -1){
+                    //execute the command
+                    if (types[index] == 0)
+                        L1.read(readInstructions[index].getInstruction());
+                    else
+                        L2.write(readInstructions[index].getInstruction());
+                    System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
+                    System.out.println(" , Cycle: "+cycles);
+                    backup--;
+
+                    boolean readNext = next(cycles);
+                    if (readNext) {
+                        //0 = read, 1 = write
+                        temp = in.nextLine();
+                        currentInstruction = getInstruction(temp);
+                        type = getType(temp);
+                        types[instructionCounter-1] = type;
+
+                        //get latency for the instruction
+                        int latency;
+                        if (type == 0)
+                            latency = dummyL1.read(currentInstruction);
+                        else
+                            latency = dummyL2.write(currentInstruction);
+
+                        //put the instruction in the list of instructions read
+                        readInstructions[instructionCounter-1] = new CacheEntry(currentInstruction, 0);
+                        readInstructions[instructionCounter-1].tag = L1.getTag(currentInstruction);
+                        backup++;
+
+                        //get the cycle which the instruction will finish at
+                        int newLat = waiting(latency, cycles, readInstructions, readInstructions[instructionCounter-1]);
+                        System.out.println("Latency: "+newLat);
+                        readInstructions[instructionCounter-1].cycles = newLat;
+
+                        //instruction is now in the buffer
+                    }
+                }
+                else {
+                    //nothing can be removed from the queue
+                    //lets check if we get another cache access or not
+                    //if we do, lets continue to push it off until we can remove one from our
+                    //outstanding misses
+                    if (accesses[instructionCounter] == cycles) {
+                        //oh no, we have to push it back because we would access it now
+                        accesses[instructionCounter]++;
+                    }
+                    else{
+                        //dont have to read another access here, it's all good
+                    }
+                }
+            }
+            else{
+                //see if another instruction has to be read
+                boolean readNext = next(cycles);
+
+                //need to read the next instruction
+                if (readNext){
+                    //0 = read, 1 = write
+                    temp = in.nextLine();
+                    currentInstruction = getInstruction(temp);
+                    type = getType(temp);
+                    types[instructionCounter-1] = type;
+
+                    //get latency for the instruction
+                    int latency;
+                    if (type == 0)
+                        latency = dummyL1.read(currentInstruction);
+                    else
+                        latency = dummyL2.write(currentInstruction);
+
+                    System.out.println(latency);
+
+                    //put the instruction in the list of instructions read
+                    CacheEntry temp2 = new CacheEntry(currentInstruction, 0);
+                    temp2.tag = L1.getTag(currentInstruction);
+
+                    //get the cycle which the instruction will finish at
+                    int newLat = waiting(latency, cycles, readInstructions, temp2);
+                    System.out.println("Latency: "+newLat);
+                    temp2.cycles = newLat;
+
+                    readInstructions[instructionCounter-1] = temp2;
+                    backup++;
+                    //instruction is now in the buffer
+                }
+                //do not need to read in another instruction
+                //check if an instruction needs to be processed
+                int index = process(cycles, readInstructions);
+                if (index != -1){
+                    //execute the command
+                    if (types[index] == 0)
+                        L1.read(readInstructions[index].getInstruction());
+                    else
+                        L2.write(readInstructions[index].getInstruction());
+                    System.out.print(index+". Instruction: "+readInstructions[index].getInstruction());
+                    System.out.println(" , Cycle: "+cycles);
+                    backup--;
+                }
+                //dont need to process a command
+            }
+            notDone = !(instructionCounter == 14 && backup == 0);
+        }
+        System.out.println(cycles);
+    }
+
+    public static int waiting(int latency, int cycles, CacheEntry[] arr, CacheEntry entry){
+        int maxi = -1;
+        for (int i = 0; i< arr.length; i++){
+            if (arr[i] != null) {
+                if (cycles < arr[i].cycles && arr[i].tagEquals(entry.tag)) {
+                    //number of cycles currently on is less than when the cache will finish
+                    //the tags match, so its a hit
+                    if (i > maxi)
+                        maxi = i;
+                }
+            }
+        }
+        if (maxi == -1) {
+            //this means that there is nothing blocking the cache from proceeding
+            return cycles + latency;
+        }
+        //got the last usage of that item (single ported)
+        if (arr[maxi].cycles == accesses[instructionCounter-1])
+            arr[maxi].cycles++;
+
+        return arr[maxi].cycles+latency;
+    }
+
+    public static void accessUnderMiss2(Scanner in, L1Cache L1, L2Cache L2){
+        int cycles = 1;
+
+        while (in.hasNextLine()){
+            //read in next line and get address (binary) and type(0 = load, 1 = write)
+            String line = in.nextLine();
+            int type = getType(line);
+            String instruction = getInstruction(line);
+
+
+
+
+        }
+    }
+
+    public static int process(int cycle, CacheEntry[] instructions){
+        int index = -1;
+        for (int i = 0; i< instructions.length; i++){
+            if (instructions[i] != null && cycle == instructions[i].cycles){
+                return i;
+            }
+        }
+        return index;
+    }
+
+    public static boolean next(int cycles){
+        if (cycles == accesses[instructionCounter]){
+            //means that we need to read another instruction now
+            instructionCounter++;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -334,6 +543,6 @@ public class Main {
     }
 
     public static void main(String[] args){
-        run(args.length);
+        run(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
     }
 }

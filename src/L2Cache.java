@@ -57,12 +57,12 @@ public class L2Cache {
     public int read(String instruction){
         //get useful info
         int index = getIndex(instruction);
-        System.out.println("Read L2: "+index);
+        //System.out.println("Read L2: "+index);
         int instructionTag = getTag(instruction);
 
         //check if it is in L2
         if (snoop(instruction)){
-            System.out.println("Hit");
+            //System.out.println("Hit");
             //it is in L2, will only need to update LRU and return latency
             for (int i = 0; i< cols; i++){
                 if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == instructionTag){
@@ -79,7 +79,7 @@ public class L2Cache {
             }
         }
         else {
-            System.out.println("L2 Miss");
+            //System.out.println("L2 Miss");
             int lat = 0;
 
             //find the next block to replace
@@ -158,13 +158,13 @@ public class L2Cache {
 
     public int writeThrough(String instruction){
         //get index of instruction to evict
-        int idx = getIndex(instruction);
+        int index = getIndex(instruction);
         int tag = getTag(instruction);
 
         if (snoop(instruction)) {
             //value is in this cache
             for (int i = 0; i < cols; i++) {
-                if ( i % blockSize == 0 && cacheEntries[idx][i].getTag() == tag){
+                if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == tag){
 
                     int lru =-1;
                     for (int j = 0; j<cols; j++){

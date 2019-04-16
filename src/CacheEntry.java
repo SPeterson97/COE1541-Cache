@@ -9,6 +9,7 @@ public class CacheEntry {
 	public int writes;
 	public int number;
 	public boolean blocked;
+	public int cycles = 10000;
 	
 	public CacheEntry(String instruction, int number) {
 		this.data = instruction;

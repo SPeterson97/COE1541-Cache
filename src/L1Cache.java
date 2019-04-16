@@ -66,7 +66,7 @@ public class L1Cache {
         int instructionTag = getTag(instruction);
 
         if (snoop(instruction)){
-            System.out.println("Hit");
+            //System.out.println("Hit");
             //if already in cache, return latency, update LRU and move on
             for (int i = 0; i< cols; i++){
                 if ( i % blockSize == 0 && cacheEntries[index][i].getTag() == instructionTag){
@@ -83,7 +83,7 @@ public class L1Cache {
             }
         }
         else {
-            System.out.println("L1 Miss");
+            //System.out.println("L1 Miss");
             int latencyL2 = 0;
 
             //find the next block to replace
